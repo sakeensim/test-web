@@ -47,7 +47,7 @@ function Profile() {
 
     const getProfile = async () => {
         try {
-            const res = await axios.get('${API_URL}/user/myProfile', {
+            const res = await axios.get(`${API_URL}/user/myProfile`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setProfile(res.data.result);
@@ -58,7 +58,7 @@ function Profile() {
 
     const fetchApprovedRequests = async () => {
         try {
-            const res = await axios.get('${API_URL}/user/approved-requests', {
+            const res = await axios.get(`${API_URL}/user/approved-requests`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const approvedDayOffs = res.data.data.filter(request => request.type === 'dayoff');
@@ -101,7 +101,7 @@ function Profile() {
                         <FormUploadImage setValue={setValue} setImage={setImage} />
                     ) : (
                         <img 
-                            src={image.secure_url || profile.profileImage} 
+                            src={image.secure_url || profile?.profileImage} 
                             className="w-full h-full object-cover" 
                             onError={(e) => e.target.style.display = 'none'}
                         />
