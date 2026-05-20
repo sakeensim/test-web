@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import useIPConfigStore from '../store/IP-Config';
 import useAuthStore from '../store/auth-store';
 import { createAlert } from '../utils/createAlert';
@@ -7,9 +7,13 @@ function NetworkSettingsPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importText, setImportText] = useState('');
   
-  const { allowedIPs, removeAllowedIP, setAllowedIPs } = useIPConfigStore();
+  const { allowedIPs, removeAllowedIP, setAllowedIPs,updateCurrentIP } = useIPConfigStore();
   const token = useAuthStore((state) => state.token);
-  
+  useEffect(() => {
+
+    updateCurrentIP()
+
+  }, [])
   // Validate IP address format
   const isValidIP = (ip) => {
     const ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
