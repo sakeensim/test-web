@@ -1,14 +1,14 @@
 import axios from "axios"
 import {create} from "zustand"
 import { persist } from "zustand/middleware"
-
+import API_URL from "../utils/api"
 //1.create store
 const authStore = (set) => ({
     user: [],
     token: null,
     loginWithZustand: async(value)=>{
         try {
-            const res = await axios.post('http://localhost:9191/login', value)
+            const res = await axios.post(`${API_URL}/login`, value)
             // console.log(res.data.payload)
             // console.log(res.data.token)
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import useAuthStore from '../store/auth-store';
 import axios from 'axios';
 import { useLocation } from 'react-router';
-
+import API_URL from "../utils/api"
 function ProtectRoutes({ el,allows }) {
   const [ok, setOk] = useState(null);
   const token = useAuthStore((state) => state.token); 
@@ -22,7 +22,7 @@ function ProtectRoutes({ el,allows }) {
     console.log('Check permission')
     try {
 
-      const res = await axios.get('http://localhost:9191/getme', {
+      const res = await axios.get(`${API_URL}/getme`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

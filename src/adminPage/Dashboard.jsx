@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, User, Search } from 'lucide-react';
 import axios from 'axios';
 import useAuthStore from '../store/auth-store';
-
+import API_URL from "../utils/api"
 function Dashboard() {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +21,7 @@ function Dashboard() {
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth() + 1;
 
-      const response = await axios.get('http://localhost:9191/admin/dashboard', {
+      const response = await axios.get(`${API_URL}/admin/dashboard`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

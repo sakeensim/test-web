@@ -2,7 +2,7 @@ import axios from 'axios';
 import React, { useState } from 'react';
 import { createAlert } from '../utils/createAlert';
 import { Link, useNavigate } from 'react-router-dom'; // Ensure you're using 'react-router-dom' here
-
+import API_URL from "../utils/api"
 function Register() {
     const navigate = useNavigate();
 
@@ -22,7 +22,7 @@ function Register() {
     const hdlSubmit = async (e) => {
         e.preventDefault();
         try {
-            const res = await axios.post('http://localhost:9191/register', value);
+            const res = await axios.post(`${API_URL}/register`, value);
             createAlert('success', 'Register Success');
             setValue({
                 firstname: '',

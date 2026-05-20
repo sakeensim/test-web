@@ -3,7 +3,7 @@ import axios from 'axios';
 import { format } from 'date-fns';
 import { Calendar, Clock, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import useAuthStore from '../store/auth-store';
-
+import API_URL from "../utils/api"
 const WorkTimeRecordPage = () => {
     const [records, setRecords] = useState([]);
     const [employees, setEmployees] = useState([]);
@@ -17,7 +17,7 @@ const WorkTimeRecordPage = () => {
     // Function to fetch employees
     const fetchEmployees = async () => {
         try {
-            const res = await axios.get('http://localhost:9191/admin/getemployee', {
+            const res = await axios.get(`${API_URL}/admin/getemployee`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -38,7 +38,7 @@ const WorkTimeRecordPage = () => {
             const year = format(selectedMonth, 'yyyy');
 
             // Build URL with the selectedEmployee
-            let url = `http://localhost:9191/admin/Work-time-record?month=${month}&year=${year}&_=${new Date().getTime()}`;
+            let url = `${API_URL}/admin/Work-time-record?month=${month}&year=${year}&_=${new Date().getTime()}`;
 
             if (selectedEmployee !== 'all') {
                 url += `&employeeId=${selectedEmployee}`;

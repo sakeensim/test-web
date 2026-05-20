@@ -1,6 +1,6 @@
 import axios from 'axios'
 import {create} from 'zustand'
-
+import API_URL from "../utils/api"
 
 const timeStore= create((set)=> ({
     time: {},
@@ -8,7 +8,7 @@ const timeStore= create((set)=> ({
 
     actionCheckIn: async (token) => {
         try {
-            const res = await axios.post('http://localhost:9191/user/check-in', null, {
+            const res = await axios.post(`${API_URL}/user/check-in`, null, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -27,7 +27,7 @@ const timeStore= create((set)=> ({
     actionCheckOut: async (id, token) => {
         try {
             const res = await axios.patch(
-                "http://localhost:9191/user/check-out",
+                `${API_URL}/user/check-out`,
                 { id },
                 {
                     headers: {
@@ -45,7 +45,7 @@ const timeStore= create((set)=> ({
     },
     
     actionDayOff: async(token, date, reason, status)=>{
-        const res = await axios.post('http://localhost:9191/user/day-off',{ date, reason, status },
+        const res = await axios.post(`${API_URL}/user/day-off`,{ date, reason, status },
             {
                 headers: {
                     Authorization: `Bearer ${token}`

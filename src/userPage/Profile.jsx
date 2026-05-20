@@ -6,7 +6,7 @@ import useAuthStore from '../store/auth-store';
 import axios from 'axios';
 import { createAlert } from '../utils/createAlert';
 import { Trash2 } from 'lucide-react';
-
+import API_URL from "../utils/api"
 function Profile() {
     const token = useAuthStore((state) => state.token);
     const user = useAuthStore((state) => state.user);
@@ -34,7 +34,7 @@ function Profile() {
 
     const hdlSubmit = async (value) => {
         try {
-            await axios.patch(`http://localhost:9191/user/update-profile/${user.id}`, value, {
+            await axios.patch(`${API_URL}/user/update-profile/${user.id}`, value, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             getProfile();
@@ -47,7 +47,7 @@ function Profile() {
 
     const getProfile = async () => {
         try {
-            const res = await axios.get('http://localhost:9191/user/myProfile', {
+            const res = await axios.get('${API_URL}/user/myProfile', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setProfile(res.data.result);
@@ -58,7 +58,7 @@ function Profile() {
 
     const fetchApprovedRequests = async () => {
         try {
-            const res = await axios.get('http://localhost:9191/user/approved-requests', {
+            const res = await axios.get('${API_URL}/user/approved-requests', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const approvedDayOffs = res.data.data.filter(request => request.type === 'dayoff');
@@ -76,7 +76,7 @@ function Profile() {
     const deleteDayOff = async (dayOffId) => {
         try {
             setIsDeletingDayOff(true);
-            await axios.delete(`http://localhost:9191/user/cancel-dayoff/${dayOffId}`, {
+            await axios.delete(`${API_URL}/user/cancel-dayoff/${dayOffId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchApprovedRequests();

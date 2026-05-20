@@ -22,7 +22,8 @@ function CheckIn() {
 
     const checkNetwork = async () => {
         try {
-            const res = await axios.get('https://ipwhois.app/json/');
+            //const res = await axios.get('https://ipwhois.app/json/');
+            const res = await axios.get('https://api.ipify.org?format=json');
             const currentIP = res.data.ip;
             setUserIP(currentIP);
             console.log("Current IP:", currentIP);

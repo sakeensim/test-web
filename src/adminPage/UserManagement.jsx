@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import useAuthStore from '../store/auth-store';
 import axios from 'axios';
 import { createAlert } from '../utils/createAlert';
-
+import API_URL from "../utils/api"
 function UserManagement() {
     const token = useAuthStore((state) => state.token);
     const user = useAuthStore((state) => state.user);
@@ -31,7 +31,7 @@ function UserManagement() {
     const fetchEmployees = async () => {
         try {
             setLoading(true);
-            const res = await axios.get('http://localhost:9191/user/list', {
+            const res = await axios.get(`${API_URL}/user/list`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setEmployees(res.data.result);
@@ -45,7 +45,7 @@ function UserManagement() {
    
     const updateSalary = async (id) => {
         try {
-            await axios.patch('http://localhost:9191/admin/update-salary',  
+            await axios.patch(`${API_URL}/admin/update-salary`,  
                 { id, baseSalary: newSalary },  // Send ID and new salary in the request body
                 { headers: { Authorization: `Bearer ${token}` } } // Correctly place headers here
             );
@@ -60,7 +60,7 @@ function UserManagement() {
 
     const handleRoleChange = async (id, newRole) => {
         try {
-            await axios.post('http://localhost:9191/user/update-role',
+            await axios.post(`${API_URL}/user/update-role`,
                 { id, role: newRole },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -74,7 +74,7 @@ function UserManagement() {
 
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:9191/user/delete/${id}`, {
+            await axios.delete(`${API_URL}/user/delete/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             createAlert('success', 'User deleted successfully');

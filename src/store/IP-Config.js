@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 const useIPConfigStore = create(
   persist(
     (set) => ({
-      allowedIPs: ['184.82.221.58'], // Default office IP
+      allowedIPs: ['113.53.176.122'], // Default office IP
       
       // Add a new IP to the list
       addAllowedIP: (ip) => set((state) => ({

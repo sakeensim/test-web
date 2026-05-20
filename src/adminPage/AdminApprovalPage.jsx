@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_URL from "../utils/api"
 import useAuthStore from '../store/auth-store';
-
 function AdminApprovalPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +15,7 @@ function AdminApprovalPage() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:9191/admin/pending-requests', {
+      const response = await axios.get(`${API_URL}/admin/pending-requests`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -30,7 +30,7 @@ function AdminApprovalPage() {
 
   const handleApprove = async (id, type) => {
     try {
-      await axios.patch(`http://localhost:9191/admin/${type}-approve/${id}`, 
+      await axios.patch(`${API_URL}/admin/${type}-approve/${id}`, 
         { status: 'APPROVED' },
         {
           headers: {
@@ -47,7 +47,7 @@ function AdminApprovalPage() {
 
   const handleReject = async (id, type) => {
     try {
-      await axios.patch(`http://localhost:9191/admin/${type}-reject/${id}`, 
+      await axios.patch(`${API_URL}/admin/${type}-reject/${id}`, 
         { status: 'REJECTED' },
         {
           headers: {
