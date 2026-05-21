@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from 'react';
+/*import React, { useState,useEffect } from 'react';
 import useIPConfigStore from '../store/IP-Config';
 import useAuthStore from '../store/auth-store';
 import { createAlert } from '../utils/createAlert';
@@ -80,7 +80,7 @@ function NetworkSettingsPage() {
 
   return (
     <div className="h-screen p-4 sm:ml-50">
-      {/* Adjust the margin based on your sidebar implementation */}
+      {/* Adjust the margin based on your sidebar implementation }
       <div className="max-w-5xl mx-auto pl-16 md:pl-16 lg:pl-16">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-white">Network Settings</h1>
@@ -119,7 +119,7 @@ function NetworkSettingsPage() {
               IP addresses can only be modified by importing a list or through the system administrator.
             </p>
             
-            {/* Import IPs form */}
+            {/* Import IPs form }
             {isImporting && (
               <div className="mb-6 p-4 border border-gray-200 bg-gray-50 rounded-md">
                 <h3 className="font-medium mb-2">Import Multiple IP Addresses</h3>
@@ -150,7 +150,7 @@ function NetworkSettingsPage() {
               </div>
             )}
             
-            {/* IP list */}
+            {/* IP list }
             <div className="border border-gray-200 rounded-md overflow-hidden mb-6">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -215,6 +215,96 @@ function NetworkSettingsPage() {
               <p className="mt-2">
                 IP changes take effect immediately for all users.
               </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default NetworkSettingsPage;*/
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+import useAuthStore from '../store/auth-store';
+import { createAlert } from '../utils/createAlert';
+import API_URL from '../utils/api';
+
+function NetworkSettingsPage() {
+  const token = useAuthStore((state) => state.token);
+
+  const [currentIP, setCurrentIP] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const registerCurrentIP = async () => {
+    try {
+      setLoading(true);
+
+      const res = await axios.post(
+        `${API_URL}/admin/register-current-ip`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setCurrentIP(res.data.clientIP);
+      createAlert('success', 'อัปเดต IP บริษัทสำเร็จ');
+      console.log('Registered IP:', res.data);
+    } catch (error) {
+      console.error('Register IP failed:', error);
+      createAlert('error', 'อัปเดต IP ไม่สำเร็จ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      registerCurrentIP();
+    }
+  }, [token]);
+
+  return (
+    <div className="h-screen p-4 sm:ml-50">
+      <div className="max-w-5xl mx-auto pl-16 md:pl-16 lg:pl-16">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-white">
+            Network Settings
+          </h1>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Office Network IP
+            </h2>
+
+            <p className="text-gray-600 mb-6">
+              เมื่อ Admin เปิดหน้านี้ ระบบจะอัปเดต IP ปัจจุบันของบริษัทให้อัตโนมัติ
+            </p>
+
+            <div className="border border-gray-200 rounded-md p-4 mb-6">
+              <p className="text-sm text-gray-500">Current Registered IP</p>
+
+              <p className="text-2xl font-bold text-blue-700 mt-2">
+                {loading ? 'Updating...' : currentIP || 'No IP registered'}
+              </p>
+            </div>
+
+            <button
+              onClick={registerCurrentIP}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Updating...' : 'Update Current IP Again'}
+            </button>
+
+            <div className="mt-6 p-4 bg-blue-50 text-blue-800 rounded-md text-sm">
+              Admin เปิดหน้านี้ → backend อ่าน IP จริง → บันทึกลง AllowedIP id=1 → employee ใช้ Wi-Fi นี้ check-in ได้
             </div>
           </div>
         </div>
