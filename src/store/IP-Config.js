@@ -35,7 +35,7 @@ const useIPConfigStore = create(
   persist(
     (set) => ({
 
-      allowedIPs: ['113.53.176.122'],
+      allowedIPs: [],
 
       addAllowedIP: (ip) => set((state) => {
 
