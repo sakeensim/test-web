@@ -1,63 +1,70 @@
 import axios from 'axios'
-import {create} from 'zustand'
-import API_URL from "../utils/api"
+import { create } from 'zustand'
+import API_URL from '../utils/api'
 
-const timeStore= create((set)=> ({
-    time: {},
-    date:{},
+const timeStore = create((set) => ({
+  time: {},
+  date: {},
 
-    actionCheckIn: async (token) => {
-        try {
-            const res = await axios.post(`${API_URL}/user/check-in`, null, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-    
-            set({ time: res.data.data }); // Update state
-            console.log("res.data.data", res.data);
-    
-            return res.data; // Return the response for use in hdlSubmit
-        } catch (error) {
-            console.error("Error in actionCheckIn:", error);
-            throw error; // Ensure the error is propagated
+  actionCheckIn: async (token, latitude, longitude, note) => {
+    try {
+      const res = await axios.post(
+        `${API_URL}/user/check-in`,
+        { latitude, longitude,note},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-    },
-    
-    actionCheckOut: async (id, token) => {
-        try {
-            const res = await axios.patch(
-                `${API_URL}/user/check-out`,
-                { id },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-            set({ time: res.data.data });
-            console.log("Check-Out Response:", res.data); // Debugging
-            return res.data; // Return response for hdlSubmit
-        } catch (error) {
-            console.error("Check-Out Error:", error);
-            throw error; // Ensure error is caught in hdlSubmit
-        }
-    },
-    
-    actionDayOff: async(token, date, reason, status)=>{
-        const res = await axios.post(`${API_URL}/user/day-off`,{ date, reason, status },
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                },
-            }, 
+      )
 
-            
-        )
-        console.log("log from day off time store",res)   
-        set({date: res.data.data})
-        return res.data;  // This will ensure that the frontend gets the expected data
+      set({ time: res.data.data })
+      console.log('Check-In Response:', res.data)
+
+      return res.data
+    } catch (error) {
+      console.error('Error in actionCheckIn:', error)
+      throw error
     }
+  },
+
+  actionCheckOut: async (token, latitude, longitude,note) => {
+  try {
+    const res = await axios.patch(
+      `${API_URL}/user/check-out`,
+      { latitude, longitude,note },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    set({ time: res.data.data })
+    console.log('Check-Out Response:', res.data)
+
+    return res.data
+  } catch (error) {
+    console.error('Check-Out Error:', error)
+    throw error
+  }
+},
+
+  actionDayOff: async (token, date, reason, status) => {
+    const res = await axios.post(
+      `${API_URL}/user/day-off`,
+      { date, reason, status },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    console.log('log from day off time store', res)
+    set({ date: res.data.data })
+    return res.data
+  },
 }))
 
 export default timeStore

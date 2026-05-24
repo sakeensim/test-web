@@ -1,117 +1,5 @@
-/*import moment from 'moment/min/moment-with-locales';
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import useAuthStore from '../store/auth-store';
-import timeStore from '../store/time-store';
-import axios from 'axios';
-import { createAlert } from '../utils/createAlert';
-import useIPConfigStore from '../store/IP-Config';
-
-function CheckOut() {
-    const token = useAuthStore((state) => state.token);
-    const { time, actionCheckOut } = timeStore();
-    const { allowedIPs } = useIPConfigStore(); // Get allowed IPs from store
-    const [isAllowed, setIsAllowed] = useState(false);
-    const [userIP, setUserIP] = useState('');
-
-    useEffect(() => {
-        checkNetwork();
-    }, [allowedIPs]); // Re-check when allowed IPs change
-
-    const checkNetwork = async () => {
-        try {
-            const res = await axios.get('https://api.ipify.org?format=json');
-            const currentIP = res.data.ip;
-            setUserIP(currentIP);
-            console.log("Current IP:", currentIP);
-            console.log("Allowed IPs:", allowedIPs);
-
-            // Check if current IP is in the allowed list
-            setIsAllowed(allowedIPs.includes(currentIP));
-        } catch (error) {
-            console.error("Error fetching IP:", error);
-            setIsAllowed(false);
-        }
-    };
-
-    const hdlSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!isAllowed) {
-            createAlert("info", "คุณต้องเชื่อมต่อไวไฟบริษัท!");
-            return;
-        }
-
-        if (!time?.id) {
-            createAlert("error", "ไม่พบ ID การเข้าเช็คอิน กรุณาลองใหม่");
-            return;
-        }
-
-        try {
-            console.log("Sending check-out request with ID:", time.id);
-            const res = await actionCheckOut(time.id, token);
-            console.log("Check-Out Response:", res);
-            createAlert("success", "ลงชื่อออก สำเร็จ");
-        } catch (error) {
-            console.error("Check-Out Failed:", error);
-            createAlert("error", "Check-out ล้มเหลว");
-        }
-    };
-
-    return (
-        <div className="flex flex-col lg:flex-row justify-center items-center h-screen p-4">
-            
-            {Hidden on mobile, visible on larger screens}
-            <div className="hidden lg:flex text-4xl text-white leading-relaxed ml-10">
-                "Work with purpose, live with passion."
-            </div>
-
-            {Check-Out Box}
-            <div className="flex flex-col items-center border-white bg-gray-100 rounded-2xl 
-                            w-80 h-120 sm:w-96 sm:h-96 lg:w-100 lg:h-150 p-6 shadow-lg">
-                <h3 className="text-2xl text-blue-900 mt-3">เวลาเข้า-ออกงาน</h3>
-
-                {/* Navigation Buttons }
-                <div className="flex mt-6 w-full justify-center">
-                    <Link to='/user/check-in' className="w-36 h-12 flex justify-center items-center text-xl text-blue-950 bg-white rounded-xl border border-gray-300">
-                        เวลาเข้า
-                    </Link>
-                    <p className="w-36 h-12 flex justify-center items-center text-xl text-white bg-blue-700 rounded-xl ml-2">
-                        เวลาออก
-                    </p>
-                </div>
-
-                {Form }
-                <form onSubmit={hdlSubmit} className="w-full mt-6">
-                    <div className="flex flex-col gap-4">
-                        <input
-                            disabled
-                            placeholder='วันที่'
-                            type='text'
-                            defaultValue={moment(new Date()).locale("th").format("dddd ll")}
-                            className="border w-full h-10 border-gray-400 rounded-md p-2"
-                        />
-                        <input
-                            disabled
-                            placeholder='เวลา'
-                            type='text'
-                            defaultValue={moment(new Date()).locale("th").format("LTS")}
-                            className="border w-full h-10 border-gray-400 rounded-md p-2"
-                        />
-                        <button className="w-full h-12 rounded-lg bg-blue-700 text-xl text-white mt-3">
-                            Check-Out
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-        </div>
-    );
-}
-
-export default CheckOut;*/
 import moment from 'moment/min/moment-with-locales'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import useAuthStore from '../store/auth-store'
@@ -120,95 +8,172 @@ import { createAlert } from '../utils/createAlert'
 
 function CheckOut() {
   const token = useAuthStore((state) => state.token)
-  const { time, actionCheckOut } = timeStore()
+  const { actionCheckOut } = timeStore()
+  const [now, setNow] = useState(new Date())
+  const [note, setNote] = useState('')
+useEffect(() => {
+  const timer = setInterval(() => {
+    setNow(new Date())
+  }, 1000)
 
+  return () => clearInterval(timer)
+}, [])
   const hdlSubmit = async (e) => {
     e.preventDefault()
 
-    if (!time?.id) {
-      createAlert('error', 'ไม่พบ ID การเข้าเช็คอิน กรุณาลองใหม่')
+    if (!navigator.geolocation) {
+      createAlert('error', 'อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง')
       return
     }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
 
-    try {
-      const res = await actionCheckOut(time.id, token)
+          const res = await actionCheckOut(token, latitude, longitude, note)
 
-      console.log('Check-out response:', res)
+          console.log('Check-out response:', res)
+          createAlert('success', 'ลงชื่อออก สำเร็จ')
+        } catch (error) {
+          console.error('Check-out failed:', error)
 
-      createAlert('success', 'ลงชื่อออก สำเร็จ')
-    } catch (error) {
-      console.error('Check-out failed:', error)
+          const status = error.response?.status
+          const message = error.response?.data?.message
 
-      const status = error.response?.status
-      const message = error.response?.data?.message
+          if (status === 400 || status === 403) {
+            createAlert('info', message || 'ไม่สามารถ Check-out ได้')
+            return
+          }
 
-      if (status === 403) {
-        createAlert('info', 'คุณต้องเชื่อมต่อไวไฟบริษัท!')
-        return
+          if (status === 401) {
+            createAlert('error', 'กรุณาเข้าสู่ระบบใหม่')
+            return
+          }
+
+          createAlert('error', message || 'Check-out ล้มเหลว')
+        }
+      },
+      (error) => {
+        console.error('Location error:', error)
+        createAlert('error', 'กรุณาอนุญาตให้เข้าถึงตำแหน่ง')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
       }
-
-      if (status === 401) {
-        createAlert('error', 'กรุณาเข้าสู่ระบบใหม่')
-        return
-      }
-
-      createAlert('error', message || 'Check-out ล้มเหลว')
-    }
+    )
   }
 
   return (
-    <div className="flex flex-col lg:flex-row justify-center items-center h-screen p-4">
-      <div className="hidden lg:flex text-4xl text-white leading-relaxed ml-10">
-        "Work with purpose, live with passion."
-      </div>
-
-      <div className="flex flex-col items-center border-white bg-gray-100 rounded-2xl w-80 h-120 sm:w-96 sm:h-96 lg:w-100 lg:h-150 p-6 shadow-lg">
-        <h3 className="text-2xl text-blue-900 mt-3">
-          เวลาเข้า-ออกงาน
-        </h3>
-
-        <div className="flex mt-6 w-full justify-center">
-          <Link
-            to="/user/check-in"
-            className="w-36 h-12 flex justify-center items-center text-xl text-blue-950 bg-white rounded-xl border border-gray-300"
-          >
-            เวลาเข้า
-          </Link>
-
-          <p className="w-36 h-12 flex justify-center items-center text-xl text-white bg-blue-700 rounded-xl ml-2">
-            เวลาออก
+  <div className="min-h-[calc(100vh-2rem)] w-full">
+    <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl items-center justify-center px-4 py-8">
+      <div className="grid w-full gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
+        <div className="hidden lg:block">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#FFB347]">
+            Attendance
           </p>
+
+          <h1 className="mt-4 max-w-xl text-5xl font-bold leading-tight text-white">
+            Finish your workday properly.
+          </h1>
+
+          <p className="mt-4 max-w-lg text-lg text-white/50">
+            ลงชื่อออกเมื่อสิ้นสุดเวลาทำงาน เพื่อบันทึกเวลาทำงานให้ครบถ้วน
+          </p>
+
+          <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
+            <p className="text-sm text-white/40">Today</p>
+            <p className="mt-2 text-3xl font-bold text-white">
+              {moment(now).locale('th').format('dddd ll')}
+            </p>
+            <p className="mt-2 text-xl text-[#FFB347]">
+              {moment(now).locale('th').format('LTS')}
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={hdlSubmit} className="w-full mt-6">
-          <div className="flex flex-col gap-4">
-            <input
-              disabled
-              placeholder="วันที่"
-              type="text"
-              value={moment(new Date()).locale('th').format('dddd ll')}
-              className="border w-full h-10 border-gray-400 rounded-md p-2"
-            />
+        <div className="rounded-[2rem] border border-white/10 bg-[#11152E]/90 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#FFB347]">
+              WorkPal
+            </p>
 
-            <input
-              disabled
-              placeholder="เวลา"
-              type="text"
-              value={moment(new Date()).locale('th').format('LTS')}
-              className="border w-full h-10 border-gray-400 rounded-md p-2"
-            />
+            <h2 className="mt-2 text-3xl font-bold text-white">
+              เวลาเข้า-ออกงาน
+            </h2>
+
+            <p className="mt-2 text-sm text-white/40">
+              ตรวจสอบวันที่และเวลาก่อนกด Check-Out
+            </p>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3 rounded-2xl bg-white/[0.04] p-2">
+            <Link
+              to="/user/check-in"
+              className="flex h-12 items-center justify-center rounded-xl text-sm font-semibold text-white/60 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              เวลาเข้า
+            </Link>
+
+            <div className="flex h-12 items-center justify-center rounded-xl bg-[#FFB347] text-sm font-semibold text-[#1B1F3B] shadow-lg">
+              เวลาออก
+            </div>
+          </div>
+
+          <form onSubmit={hdlSubmit} className="mt-6 space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs text-white/40">วันที่</p>
+              <input
+                disabled
+                type="text"
+                value={moment(now).locale('th').format('dddd ll')}
+                className="mt-1 w-full bg-transparent text-lg font-semibold text-white outline-none"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs text-white/40">เวลา</p>
+              <input
+                disabled
+                type="text"
+                value={moment(now).locale('th').format('LTS')}
+                className="mt-1 w-full bg-transparent text-lg font-semibold text-white outline-none"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs text-white/40">หมายเหตุ</p>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="เช่น ออกก่อนเวลา / มีธุระ / เหตุผลเพิ่มเติม"
+                rows={3}
+                className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+              />
+            </div>
 
             <button
               type="submit"
-              className="w-full h-12 rounded-lg bg-blue-700 text-xl text-white mt-3"
+              className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-[#FFB347] text-base font-bold text-[#1B1F3B] shadow-[0_0_30px_rgba(255,179,71,0.22)] transition hover:scale-[1.01] active:scale-[0.98]"
             >
               Check-Out
             </button>
+          </form>
+
+          <div className="mt-5 rounded-2xl border border-[#FFB347]/20 bg-[#FFB347]/10 p-4">
+            <p className="text-sm font-medium text-[#FFB347]">
+              Check-Out Reminder
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-white/45">
+              ระบบจะบันทึกเวลาสิ้นสุดการทำงานของคุณในวันนี้
+            </p>
           </div>
-        </form>
+        </div>
       </div>
     </div>
-  )
+  </div>
+)
 }
 
 export default CheckOut

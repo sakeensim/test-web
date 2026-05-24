@@ -4,14 +4,15 @@ import Sidebar from '../components/Sidebar'
 
 function Layout() {
   return (
-    <>
-    <div className='bg-gradient-to-t from-blue-400 to-cyan-400 min-h-screen'>
-       
-        <Outlet/>
-
+    <div className="relative min-h-screen bg-[#1B1F3B] text-white">
+      <div className="flex min-h-screen">
         <Sidebar />
+
+        <main className="relative z-0 flex-1 min-w-0 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+          <Outlet />
+        </main>
+      </div>
     </div>
-    </>
   )
 }
 

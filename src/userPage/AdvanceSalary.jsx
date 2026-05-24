@@ -1,71 +1,130 @@
-import moment from 'moment/min/moment-with-locales';
-import React, { useState } from 'react';
-import salaryStore from '../store/salary-store';
-import useAuthStore from '../store/auth-store';
-import { createAlert } from '../utils/createAlert';
+import moment from 'moment/min/moment-with-locales'
+import React, { useState } from 'react'
+import salaryStore from '../store/salary-store'
+import useAuthStore from '../store/auth-store'
+import { createAlert } from '../utils/createAlert'
 
 function AdvanceSalary() {
-  const token = useAuthStore((state) => state.token);
-  const { actionSalary } = salaryStore();
-  const [amount, setAmount] = useState('');
+  const token = useAuthStore((state) => state.token)
+  const { actionSalary } = salaryStore()
+  const [amount, setAmount] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const hdlSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
-    if (!amount) {
-      createAlert('error', 'กรุณากรอกจำนวนเงิน!');
-      return;
+    if (!amount || Number(amount) <= 0) {
+      createAlert('error', 'กรุณากรอกจำนวนเงินให้ถูกต้อง')
+      return
     }
-
-    createAlert('success', 'Your request has been submitted');
 
     try {
-      await actionSalary(token, amount);
-      setAmount(''); // Reset input after success
+      setLoading(true)
+
+      await actionSalary(token, amount)
+
+      createAlert('success', 'Your request has been submitted')
+      setAmount('')
     } catch (error) {
-      console.error('Error submitting advance salary request:', error);
+      console.error('Error submitting advance salary request:', error)
+
+      createAlert(
+        'error',
+        error.response?.data?.message || 'Failed to submit request'
+      )
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="flex flex-col lg:flex-row justify-center items-center min-h-screen p-4">
-      
-      {/* Hidden on mobile, visible on larger screens */}
-      <div className="hidden lg:flex text-4xl text-white leading-relaxed ml-10">
-        “Take a break, take a breath, and take care of yourself."
-      </div>
+    <div className="min-h-[calc(100vh-2rem)] w-full">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl items-center justify-center px-4 py-8">
+        <div className="grid w-full gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
+          <div className="hidden lg:block">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#FFB347]">
+              Salary Request
+            </p>
 
-      {/* Salary Request Box */}
-      <div className="flex flex-col items-center border-white bg-gray-100 rounded-2xl 
-                      w-80 h-120 sm:w-96 sm:h-96 lg:w-100 lg:h-150 p-6 shadow-lg">
-        <h3 className="text-2xl text-blue-900 mt-3">Advance Salary</h3>
+            <h1 className="mt-4 max-w-xl text-5xl font-bold leading-tight text-white">
+              Request your advance salary with confidence.
+            </h1>
 
-        {/* Form */}
-        <form onSubmit={hdlSubmit} className="w-full mt-6">
-          <div className="flex flex-col gap-4">
-            <input
-              disabled
-              placeholder="วันที่"
-              type="text"
-              defaultValue={moment(new Date()).locale("th").format("dddd ll")}
-              className="border w-full h-10 border-gray-400 rounded-md p-2"
-            />
-            <input
-              placeholder="จำนวนเงิน (บาท)"
-              type="text"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="border w-full h-10 border-gray-400 rounded-md p-2"
-            />
-            <button type="submit" className="w-full h-12 rounded-lg bg-blue-700 text-xl text-white mt-10">
-              Submit
-            </button>
+            <p className="mt-4 max-w-lg text-lg text-white/50">
+              ส่งคำขอเบิกเงินล่วงหน้าให้ผู้ดูแลตรวจสอบและอนุมัติ
+            </p>
+
+            <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
+              <p className="text-sm text-white/40">Request Date</p>
+              <p className="mt-2 text-3xl font-bold text-white">
+                {moment(new Date()).locale('th').format('dddd ll')}
+              </p>
+            </div>
           </div>
-        </form>
-      </div>
 
+          <div className="rounded-[2rem] border border-white/10 bg-[#11152E]/90 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#FFB347]">
+                WorkPal
+              </p>
+
+              <h2 className="mt-2 text-3xl font-bold text-white">
+                เบิกเงินล่วงหน้า
+              </h2>
+
+              <p className="mt-2 text-sm text-white/40">
+                กรอกจำนวนเงินที่ต้องการเบิก แล้วส่งคำขอให้แอดมินอนุมัติ
+              </p>
+            </div>
+
+            <form onSubmit={hdlSubmit} className="mt-6 space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-xs text-white/40">วันที่ขอเบิก</p>
+                <input
+                  disabled
+                  type="text"
+                  value={moment(new Date()).locale('th').format('dddd ll')}
+                  className="mt-1 w-full bg-transparent text-lg font-semibold text-white outline-none"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-xs text-white/40">จำนวนเงิน</p>
+                <input
+                  placeholder="0.00"
+                  type="number"
+                  min="1"
+                  value={amount}
+                  disabled={loading}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="mt-1 w-full bg-transparent text-2xl font-bold text-white outline-none placeholder:text-white/20 disabled:opacity-50"
+                />
+                <p className="mt-1 text-xs text-white/35">บาท</p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-[#FFB347] text-base font-bold text-[#1B1F3B] shadow-[0_0_30px_rgba(255,179,71,0.22)] transition hover:scale-[1.01] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </form>
+
+            <div className="mt-5 rounded-2xl border border-[#FFB347]/20 bg-[#FFB347]/10 p-4">
+              <p className="text-sm font-medium text-[#FFB347]">
+                Advance Salary Info
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-white/45">
+                คำขอของคุณจะถูกส่งไปยังแอดมินเพื่อพิจารณาอนุมัติ
+                หากยอดเงินเกินเงินเดือนคงเหลือ ระบบจะแจ้งเตือนอัตโนมัติ
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
 
-export default AdvanceSalary;
+export default AdvanceSalary

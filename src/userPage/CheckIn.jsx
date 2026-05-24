@@ -1,114 +1,4 @@
-/*import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import moment from 'moment/min/moment-with-locales';
-import axios from 'axios';
-import useAuthStore from '../store/auth-store';
-import timeStore from '../store/time-store';
-import { createAlert } from '../utils/createAlert';
-import useIPConfigStore from '../store/IP-Config';
-
-function CheckIn() {
-    const token = useAuthStore((state) => state.token);
-    const { actionCheckIn } = timeStore();
-    const { allowedIPs } = useIPConfigStore(); // Get allowed IPs from store
-    const [isAllowed, setIsAllowed] = useState(false);
-
-    const [userIP, setUserIP] = useState('');
-
-    useEffect(() => {
-        checkNetwork();
-    }, [allowedIPs]); // Re-check when allowed IPs change
-
-
-    const checkNetwork = async () => {
-        try {
-            //const res = await axios.get('https://ipwhois.app/json/');
-            const res = await axios.get('https://api.ipify.org?format=json');
-            const currentIP = res.data.ip;
-            setUserIP(currentIP);
-            console.log("Current IP:", currentIP);
-            console.log("Allowed IPs:", allowedIPs);
-
-            // Check if current IP is in the allowed list
-            setIsAllowed(allowedIPs.includes(currentIP));
-        } catch (error) {
-            console.error("Error fetching IP:", error);
-            setIsAllowed(false);
-        }
-    };
-
-    const hdlSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!isAllowed) {
-            createAlert("info", "คุณต้องเชื่อมต่อไวไฟบริษัท!");
-            return;
-        }
-
-        try {
-            console.log("Sending check-in request...");
-            const res = await actionCheckIn(token);
-            console.log("Check-in response:", res);
-            createAlert("success", "ลงชื่อเข้า สำเร็จ");
-        } catch (error) {
-            console.error("Check-in failed:", error);
-            createAlert("error", "Check-in ล้มเหลว");
-        }
-    };
-
-    return (
-        <div className="flex flex-col lg:flex-row justify-center items-center h-screen p-4">
-            
-            //{ Hidden on mobile, visible on larger screens}
-            <div className="hidden lg:flex text-4xl text-white leading-relaxed ml-10">
-                "Work with purpose, live with passion."
-            </div>
-
-            //{ Check-In Box}
-            <div className="flex flex-col items-center border-white bg-gray-100 rounded-2xl 
-                            w-80 h-120 sm:w-96 sm:h-96 lg:w-100 lg:h-150 p-6 shadow-lg">
-                <h3 className="text-2xl text-blue-900 mt-3">เวลาเข้า-ออกงาน</h3>
-
-                //{ Navigation Buttons }
-                <div className="flex mt-6 w-full justify-center">
-                    <p className="w-36 h-12 flex justify-center items-center text-xl text-white bg-blue-700 rounded-xl">
-                        เวลาเข้า
-                    </p>
-                    <Link to='/user/check-out' className="w-36 h-12 flex justify-center items-center text-xl text-blue-950 bg-white rounded-xl border border-gray-300 ml-2">
-                        เวลาออก
-                    </Link>
-                </div>
-
-                //{ Form }
-                <form onSubmit={hdlSubmit} className="w-full mt-6">
-                    <div className="flex flex-col gap-4">
-                        <input
-                            disabled
-                            placeholder='วันที่'
-                            type='text'
-                            defaultValue={moment(new Date()).locale("th").format("dddd ll")}
-                            className="border w-full h-10 border-gray-400 rounded-md p-2"
-                        />
-                        <input
-                            disabled
-                            placeholder='เวลา'
-                            type='text'
-                            defaultValue={moment(new Date()).locale("th").format("LTS")}
-                            className="border w-full h-10 border-gray-400 rounded-md p-2"
-                        />
-                        <button type="submit" className="w-full h-12 rounded-lg bg-blue-700 text-xl text-white mt-3">
-                            Check-In
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-        </div>
-    );
-}
-
-export default CheckIn; */
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import moment from 'moment/min/moment-with-locales'
 
@@ -119,89 +9,173 @@ import { createAlert } from '../utils/createAlert'
 function CheckIn() {
   const token = useAuthStore((state) => state.token)
   const { actionCheckIn } = timeStore()
+  const [now, setNow] = useState(new Date())
+  const [note, setNote] = useState('')
+useEffect(() => {
+  const timer = setInterval(() => {
+    setNow(new Date())
+  }, 1000)
+
+  return () => clearInterval(timer)
+}, [])
 
   const hdlSubmit = async (e) => {
     e.preventDefault()
 
-    try {
-      const res = await actionCheckIn(token)
-
-      console.log('Check-in response:', res)
-
-      createAlert('success', 'ลงชื่อเข้า สำเร็จ')
-    } catch (error) {
-      console.error('Check-in failed:', error)
-
-      const status = error.response?.status
-      const message = error.response?.data?.message
-
-      if (status === 403) {
-        createAlert('info', 'คุณต้องเชื่อมต่อไวไฟบริษัท!')
-        return
-      }
-
-      if (status === 401) {
-        createAlert('error', 'กรุณาเข้าสู่ระบบใหม่')
-        return
-      }
-
-      createAlert('error', message || 'Check-in ล้มเหลว')
+    if (!navigator.geolocation) {
+      createAlert('error', 'อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง')
+      return
     }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+
+          const res = await actionCheckIn(token, latitude, longitude, note)
+
+          console.log('Check-in response:', res)
+          createAlert('success', 'ลงชื่อเข้า สำเร็จ')
+        } catch (error) {
+          console.error('Check-in failed:', error)
+
+          const status = error.response?.status
+          const message = error.response?.data?.message
+
+          if (status === 403) {
+            createAlert('info', message || 'คุณอยู่นอกพื้นที่ Check-in')
+            return
+          }
+
+          if (status === 401) {
+            createAlert('error', 'กรุณาเข้าสู่ระบบใหม่')
+            return
+          }
+
+          createAlert('error', message || 'Check-in ล้มเหลว')
+        }
+      },
+      (error) => {
+        console.error('Location error:', error)
+        createAlert('error', 'กรุณาอนุญาตให้เข้าถึงตำแหน่ง')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    )
   }
 
   return (
-    <div className="flex flex-col lg:flex-row justify-center items-center h-screen p-4">
-      <div className="hidden lg:flex text-4xl text-white leading-relaxed ml-10">
-        "Work with purpose, live with passion."
-      </div>
-
-      <div className="flex flex-col items-center border-white bg-gray-100 rounded-2xl w-80 h-120 sm:w-96 sm:h-96 lg:w-100 lg:h-150 p-6 shadow-lg">
-        <h3 className="text-2xl text-blue-900 mt-3">
-          เวลาเข้า-ออกงาน
-        </h3>
-
-        <div className="flex mt-6 w-full justify-center">
-          <p className="w-36 h-12 flex justify-center items-center text-xl text-white bg-blue-700 rounded-xl">
-            เวลาเข้า
+  <div className="min-h-[calc(100vh-2rem)] w-full">
+    <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl items-center justify-center px-4 py-8">
+      <div className="grid w-full gap-6 lg:grid-cols-[1fr_420px] lg:items-center">
+        <div className="hidden lg:block">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#FFB347]">
+            Attendance
           </p>
 
-          <Link
-            to="/user/check-out"
-            className="w-36 h-12 flex justify-center items-center text-xl text-blue-950 bg-white rounded-xl border border-gray-300 ml-2"
-          >
-            เวลาออก
-          </Link>
+          <h1 className="mt-4 max-w-xl text-5xl font-bold leading-tight text-white">
+            Start your workday with one tap.
+          </h1>
+
+          <p className="mt-4 max-w-lg text-lg text-white/50">
+            เช็กอินด้วยตำแหน่ง GPS เพื่อยืนยันว่าคุณอยู่ในพื้นที่ทำงาน
+          </p>
+
+          <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
+            <p className="text-sm text-white/40">Today</p>
+            <p className="mt-2 text-3xl font-bold text-white">
+              {moment(now).locale('th').format('dddd ll')}
+            </p>
+            <p className="mt-2 text-xl text-[#00B8A9]">
+              {moment(now).locale('th').format('LTS')}
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={hdlSubmit} className="w-full mt-6">
-          <div className="flex flex-col gap-4">
-            <input
-              disabled
-              placeholder="วันที่"
-              type="text"
-              value={moment(new Date()).locale('th').format('dddd ll')}
-              className="border w-full h-10 border-gray-400 rounded-md p-2"
-            />
+        <div className="rounded-[2rem] border border-white/10 bg-[#11152E]/90 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#FFB347]">
+              WorkPal
+            </p>
 
-            <input
-              disabled
-              placeholder="เวลา"
-              type="text"
-              value={moment(new Date()).locale('th').format('LTS')}
-              className="border w-full h-10 border-gray-400 rounded-md p-2"
-            />
+            <h2 className="mt-2 text-3xl font-bold text-white">
+              เวลาเข้า-ออกงาน
+            </h2>
+
+            <p className="mt-2 text-sm text-white/40">
+              กรุณาอนุญาตการเข้าถึงตำแหน่งก่อนเช็กอิน
+            </p>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3 rounded-2xl bg-white/[0.04] p-2">
+            <div className="flex h-12 items-center justify-center rounded-xl bg-[#00B8A9] text-sm font-semibold text-[#071B1A] shadow-lg">
+              เวลาเข้า
+            </div>
+
+            <Link
+              to="/user/check-out"
+              className="flex h-12 items-center justify-center rounded-xl text-sm font-semibold text-white/60 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              เวลาออก
+            </Link>
+          </div>
+
+          <form onSubmit={hdlSubmit} className="mt-6 space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs text-white/40">วันที่</p>
+              <input
+                disabled
+                type="text"
+                value={moment(now).locale('th').format('dddd ll')}
+                className="mt-1 w-full bg-transparent text-lg font-semibold text-white outline-none"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs text-white/40">เวลา</p>
+              <input
+                disabled
+                type="text"
+                value={moment(now).locale('th').format('LTS')}
+                className="mt-1 w-full bg-transparent text-lg font-semibold text-white outline-none"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-xs text-white/40">หมายเหตุ</p>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="เช่น รถติด / ไปทำงานนอกสถานที่ / เหตุผลเพิ่มเติม"
+                rows={3}
+                className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+              />
+            </div>
 
             <button
               type="submit"
-              className="w-full h-12 rounded-lg bg-blue-700 text-xl text-white mt-3"
+              className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-[#00B8A9] text-base font-bold text-[#1B1F3B] shadow-[0_0_30px_rgba(0,184,169,0.22)] transition hover:scale-[1.01] active:scale-[0.98]"
             >
               Check-In
             </button>
+          </form>
+
+          <div className="mt-5 rounded-2xl border border-[#00B8A9]/20 bg-[#00B8A9]/10 p-4">
+            <p className="text-sm font-medium text-[#00B8A9]">
+              GPS Location Required
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-white/45">
+              ระบบจะใช้ตำแหน่งปัจจุบันของคุณเพื่อตรวจสอบพื้นที่ทำงาน
+            </p>
           </div>
-        </form>
+        </div>
       </div>
     </div>
-  )
+  </div>
+)
 }
 
 export default CheckIn

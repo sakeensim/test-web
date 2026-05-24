@@ -1,68 +1,48 @@
 import React, { useEffect, useState } from 'react'
-import useAuthStore from '../store/auth-store';
-import axios from 'axios';
-import { useLocation } from 'react-router';
-import API_URL from "../utils/api"
-function ProtectRoutes({ el,allows }) {
-  const [ok, setOk] = useState(null);
-  const token = useAuthStore((state) => state.token); 
-  console.log("OK state5555:",ok)
-  
+import { Navigate } from 'react-router'
+import axios from 'axios'
 
-  const location = useLocation()
+import useAuthStore from '../store/auth-store'
+import API_URL from '../utils/api'
 
+function ProtectRoutes({ el, allows }) {
+  const [ok, setOk] = useState(null)
+  const token = useAuthStore((state) => state.token)
 
   useEffect(() => {
-    console.log("OK state inside useEffect:",ok)
-    checkPermission()
-
-  }, [location.pathname])
-
-  const checkPermission = async () => {
-    console.log('Check permission')
-    try {
-
-      const res = await axios.get(`${API_URL}/getme`, {
-        headers: {
-          Authorization: `Bearer ${token}`
+    const checkPermission = async () => {
+      try {
+        if (!token) {
+          setOk(false)
+          return
         }
-      })
-      
-      console.log('allows', allows)
 
-      const role = res.data.result.role
+        const res = await axios.get(`${API_URL}/getme`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
 
-      console.log('role', role)
-
-      console.log('allows.includes(role)', allows.includes(role))
-
-      setOk(allows.includes(role))
-      // if(allows.includes(role)){
-      //   setOk(true)
-      // }else{
-      //   setOk(false)
-      // }
-
-      
-    } catch (error) {
-      console.log(error)
-      setOk(false)
+        const role = res.data.result.role
+        setOk(allows.includes(role))
+      } catch (error) {
+        console.log(error)
+        setOk(false)
+      }
     }
-  }
 
-  console.log('ok', ok)
-
+    checkPermission()
+  }, [token])
 
   if (ok === null) {
-    console.log("step 1 in ok === null");
-    return <h1>Loading...</h1>;
+    return <h1>Loading...</h1>
   }
+
   if (!ok) {
-    return <h1>Unauthorize</h1>;
+    return <Navigate to="/" replace />
   }
 
-
-  return el;
+  return el
 }
 
 export default ProtectRoutes

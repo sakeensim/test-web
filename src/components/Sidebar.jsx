@@ -1,6 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import useAuthStore from "../store/auth-store";
+import React, { useState, useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import useAuthStore from '../store/auth-store'
+
+import {
+  LogOut,
+  History as HistoryIcon,
+  CalendarDays,
+  FileCheck,
+  Menu,
+  X,
+  Building2,
+} from 'lucide-react'
+
 import {
   ApprovedIcon,
   CheckinIcon,
@@ -10,170 +21,261 @@ import {
   ProfileIcon,
   SalaryIcon,
   UserManageIcon,
-} from "../icon/icon";
-import { FileCheck, GlobeLock, Menu, Network } from "lucide-react";
+} from '../icon/icon'
 
 function Sidebar() {
-  const user = useAuthStore((state) => state.user);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const user = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
 
-  console.log('user', user)
-  // Check if we're on mobile and update state when window resizes
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
   useEffect(() => {
     const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    // Initial check
-    checkIfMobile();
-    
-    // Add event listener
-    window.addEventListener("resize", checkIfMobile);
-    
-    // Cleanup
-    return () => window.removeEventListener("resize", checkIfMobile);
-  }, []);
+      const mobile = window.innerWidth < 768
+
+      setIsMobile(mobile)
+      setIsExpanded(!mobile)
+    }
+
+    checkIfMobile()
+
+    window.addEventListener('resize', checkIfMobile)
+
+    return () => window.removeEventListener('resize', checkIfMobile)
+  }, [])
+
+  const hdlLogout = () => {
+    logout()
+    navigate('/')
+  }
+
+  const menuItems = [
+    {
+      to: '/user',
+      icon: <ProfileIcon className="w-5 h-5" />,
+      label: 'Profile',
+    },
+    {
+      to: '/user/check-in',
+      icon: <CheckinIcon className="w-5 h-5" />,
+      label: 'Check-In',
+    },
+    {
+      to: '/user/check-out',
+      icon: <CheckoutIcon className="w-5 h-5" />,
+      label: 'Check-Out',
+    },
+    {
+      to: '/user/advancd-salary',
+      icon: <SalaryIcon className="w-5 h-5" />,
+      label: 'Advance Salary',
+    },
+    {
+      to: '/user/day-off',
+      icon: <DayoffIcon className="w-5 h-5" />,
+      label: 'Day-Off',
+    },
+    {
+      to: '/user/history',
+      icon: <HistoryIcon className="w-5 h-5" />,
+      label: 'History',
+    },
+  ]
+
+  const adminItems = [
+    {
+      to: '/admin',
+      icon: <ApprovedIcon className="w-5 h-5" />,
+      label: 'Approved',
+    },
+    {
+      to: '/admin/dashboard',
+      icon: <DashboardIcon className="w-5 h-5" />,
+      label: 'Dashboard',
+    },
+
+    ...(user?.role === 'OWNER'
+      ? [
+          {
+            to: '/admin/user-management',
+            icon: <UserManageIcon className="w-5 h-5" />,
+            label: 'User Management',
+          },
+        ]
+      : []),
+
+    {
+      to: '/admin/Work-time-record',
+      icon: <FileCheck className="w-5 h-5" />,
+      label: 'Worktime Record',
+    },
+    {
+      to: '/admin/holiday',
+      icon: <CalendarDays className="w-5 h-5" />,
+      label: 'Holiday',
+    },
+    {
+      to: '/admin/organization',
+      icon: <Building2 className="w-5 h-5" />,
+      label: 'Organization',
+    },
+  ]
+
+  const allMenuItems = [
+    ...menuItems,
+    ...(user?.role === 'ADMIN' || user?.role === 'OWNER' ? adminItems : []),
+  ]
 
   return (
-    <div className="relative h-screen">
-      {/* Toggle Button - Visible on all screens, positioned differently */}
-      <button
-        className={`z-10 fixed top-4 ${isExpanded ? "left-44 md:left-44" : "left-4"} 
-          p-2 bg-blue-500 text-white rounded-full transition-all duration-300`}
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        {/* {isExpanded ? "←" : "→"} */}
-        <Menu className="w-6 h-6" />
-      </button>
-      <nav
-        className={`h-screen fixed top-0 left-0 transition-all duration-300
-          ${isExpanded 
-            ? "w-52 bg-white shadow-lg" 
-            : "w-16 bg-transparent md:bg-white md:shadow-md"}`}
-      >
-        {/* Sidebar Links */}
-        <ul className="flex flex-col items-start w-full mt-16">
-          <li className="w-full">
-            <Link
-              to={`/user`}
-              className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-            >
-              <ProfileIcon className="w-6" /> 
-              {isExpanded && (
-                <span className="ml-2">Profile</span>
-              )}
-            </Link>
-          </li>
-          <li className="w-full">
-            <Link
-              to="/user/check-in"
-              className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-            >
-              <CheckinIcon className="w-6" />
-              {isExpanded && (
-                <span className="ml-2">Check-In</span>
-              )}
-            </Link>
-          </li>
-          <li className="w-full">
-            <Link
-              to="/user/check-out"
-              className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-            >
-              <CheckoutIcon className="w-6" />
-              {isExpanded && (
-                <span className="ml-2">Check-Out</span>
-              )}
-            </Link>
-          </li>
-          <li className="w-full">
-            <Link
-              to="/user/advancd-salary"
-              className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-            >
-              <SalaryIcon className="w-6" />
-              {isExpanded && (
-                <span className="ml-2">เบิกเงิน</span>
-              )}
-            </Link>
-          </li>
-          <li className="w-full">
-            <Link
-              to="/user/day-off"
-              className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-            >
-              <DayoffIcon className="w-6" />
-              {isExpanded && (
-                <span className="ml-2">Day-Off</span>
-              )}
-            </Link>
-          </li>
+    <>
+      {isMobile && isExpanded && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
+          onClick={() => setIsExpanded(false)}
+        />
+      )}
 
-          {/* Admin Links */}
-          {user && user.role === "ADMIN" && (
-            <>
-              <li className="w-full">
-                <Link
-                  to="/admin"
-                  className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="
+          fixed top-4 left-4 z-[9999]
+          p-3 rounded-2xl
+          bg-[#FFB347]
+          text-[#1B1F3B]
+          shadow-lg
+          hover:scale-105
+          transition-all duration-300
+        "
+      >
+        {isExpanded ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </button>
+
+      <aside
+        className={`
+          fixed md:sticky top-0 left-0 z-[9999] h-screen shrink-0
+          bg-[#11152E]/95
+          backdrop-blur-xl
+          border-r border-white/5
+          transition-all duration-300
+          flex flex-col
+
+          ${
+            isExpanded
+              ? 'w-64 translate-x-0'
+              : 'w-0 md:w-64 -translate-x-full md:translate-x-0'
+          }
+
+          overflow-hidden
+        `}
+      >
+        <div className="flex items-center h-20 px-6">
+          <h1 className="text-3xl font-bold tracking-wide">
+            <span className="text-[#00B8A9]">Work</span>
+            <span className="text-white">Pal</span>
+          </h1>
+        </div>
+
+        <div className="flex-1 px-3 space-y-2">
+          {allMenuItems.map((item) => {
+            const active = location.pathname === item.to
+
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => isMobile && setIsExpanded(false)}
+                className={`
+                  group relative flex items-center gap-4
+                  px-4 py-3 rounded-2xl
+                  transition-all duration-300 overflow-hidden
+
+                  ${
+                    active
+                      ? `
+                        bg-gradient-to-r 
+                        from-[#FFB347]/15 
+                        to-transparent
+                        text-[#FFB347]
+                        border border-[#FFB347]/10
+                        shadow-[0_0_30px_rgba(255,179,71,0.10)]
+                      `
+                      : `
+                        text-white/65
+                        hover:text-white
+                        hover:bg-white/[0.03]
+                      `
+                  }
+                `}
+              >
+                {active && (
+                  <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full bg-[#FFB347]" />
+                )}
+
+                <div
+                  className={`
+                    transition-all duration-300
+
+                    ${
+                      active
+                        ? 'text-[#FFB347] scale-110'
+                        : 'text-white/60 group-hover:text-white'
+                    }
+                  `}
                 >
-                  <ApprovedIcon className="w-6" />
-                  {isExpanded && (
-                    <span className="ml-2">Approved</span>
-                  )}
-                </Link>
-              </li>
-              <li className="w-full">
-                <Link
-                  to="/admin/dashboard"
-                  className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-                >
-                  <DashboardIcon className="w-6" />
-                  {isExpanded && (
-                    <span className="ml-2">Dashboard</span>
-                  )}
-                </Link>
-              </li>
-              <li className="w-full">
-                <Link
-                  to="/admin/user-management"
-                  className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-                >
-                  <UserManageIcon className="w-6" />
-                  {isExpanded && (
-                    <span className="ml-2">User Management</span>
-                  )}
-                </Link>
-              </li>
-              <li className="w-full">
-                <Link
-                  to="/admin/Work-time-record"
-                  className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-                >
-                  <FileCheck className="w-6" />
-                  {isExpanded && (
-                    <span className="ml-2">Worktime Record</span>
-                  )}
-                </Link>
-              </li>
-              <li className="w-full">
-                <Link
-                  to="/admin/network-setting"
-                  className="flex items-center gap-2 p-2 hover:bg-blue-500 hover:text-white"
-                >
-                  <GlobeLock className="w-6" />
-                  {isExpanded && (
-                    <span className="ml-2">Network Setting</span>
-                  )}
-                </Link>
-              </li>
-            </>
+                  {item.icon}
+                </div>
+
+                {isExpanded && (
+                  <span
+                    className={`
+                      text-sm font-medium tracking-wide
+                      transition-all duration-300
+
+                      ${
+                        active
+                          ? 'text-[#FFB347]'
+                          : 'text-white/70 group-hover:text-white'
+                      }
+                    `}
+                  >
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </div>
+
+        <div className="p-4 border-t border-white/5">
+          {isExpanded && (
+            <div className="text-xs text-white/30 tracking-wide">
+              WorkPal v1.0
+            </div>
           )}
-        </ul>
-      </nav>
-    </div>
-  );
+
+          <button
+            onClick={hdlLogout}
+            className="
+              flex w-full items-center gap-3
+              rounded-2xl px-4 py-3
+              text-white/60
+              hover:bg-red-400/10
+              hover:text-red-300
+              transition-all
+            "
+          >
+            <LogOut className="w-5 h-5" />
+
+            {isExpanded && <span className="text-sm font-medium">Logout</span>}
+          </button>
+        </div>
+      </aside>
+    </>
+  )
 }
 
-export default Sidebar;
+export default Sidebar

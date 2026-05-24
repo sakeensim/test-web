@@ -1,4 +1,4 @@
-import axios from 'axios';
+/*import axios from 'axios';
 import React, { useState } from 'react';
 import { createAlert } from '../utils/createAlert';
 import { Link, useNavigate } from 'react-router-dom'; // Ensure you're using 'react-router-dom' here
@@ -112,4 +112,4 @@ function Register() {
     );
 }
 
-export default Register;
+export default Register;*/

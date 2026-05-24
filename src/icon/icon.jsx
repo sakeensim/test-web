@@ -7,7 +7,7 @@ export const EditIcon = (props)=>{
           {...props}
         >
           <g
-            stroke="#000"
+            stroke="currentColor"
             strokeWidth={1.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -25,7 +25,7 @@ export const TrashIcon =(props)=>{
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <g fill="#1C274C">
+      <g fill="currentColor">
         <path
           fillRule="evenodd"
           clipRule="evenodd"
@@ -43,7 +43,7 @@ export const ProfileIcon =(props)=>{
       <path
         d="M100.563 2017H87.438c-.706 0-1.228-.697-.961-1.338 1.236-2.964 4.14-4.662 7.523-4.662 3.384 0 6.288 1.698 7.524 4.662.267.641-.255 1.338-.961 1.338m-10.646-12c0-2.206 1.832-4 4.083-4 2.252 0 4.083 1.794 4.083 4s-1.831 4-4.083 4c-2.251 0-4.083-1.794-4.083-4m14.039 11.636c-.742-3.359-3.064-5.838-6.119-6.963 1.619-1.277 2.563-3.342 2.216-5.603-.402-2.623-2.63-4.722-5.318-5.028-3.712-.423-6.86 2.407-6.86 5.958 0 1.89.894 3.574 2.289 4.673-3.057 1.125-5.377 3.604-6.12 6.963-.27 1.221.735 2.364 2.01 2.364h15.892c1.276 0 2.28-1.143 2.01-2.364"
         transform="translate(-140 -2159) translate(56 160)"
-        fill="#000"
+        fill="currentColor"
         stroke="none"
         strokeWidth={1}
         fillRule="evenodd"
@@ -55,7 +55,7 @@ export const ProfileIcon =(props)=>{
 export const CheckinIcon =(props)=>{
   return (
     <svg
-    fill="#000"
+    fill="currentColor"
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 46.336 46.337"
     xmlSpace="preserve"
@@ -70,7 +70,7 @@ export const CheckinIcon =(props)=>{
 export const CheckoutIcon =(props)=>{
   return (
     <svg
-      fill="#000"
+      fill="currentColor"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 45.655 45.655"
       xmlSpace="preserve"
@@ -89,11 +89,11 @@ export const DayoffIcon = (props)=>{
       id="Layer_1"
       xmlSpace="preserve"
       xmlns="http://www.w3.org/2000/svg"
-      fill="#000"
+      fill="currentColor"
       {...props}
     >
       <g id="SVGRepo_iconCarrier">
-        <style>{".st0{fill:#333}"}</style>
+        <style>{".st0{fill:currentColor}"}</style>
         <path
           className="st0"
           d="M443.9 109.1h-50.8V64.2c8.7-1 15.5-8.3 15.5-17.3 0-9.6-7.8-17.4-17.4-17.4h-87.6c-9.6 0-17.4 7.8-17.4 17.4 0 8.6 6.2 15.7 14.4 17.2v45.1h-55.1c-11.8 0-21.4 9.6-21.4 21.5v24.6h38c12.4 0 23.3 6.7 29.2 16.7h115.9c3.9 0 7 3.1 7 7s-3.1 7-7 7H389v9.9c0 3.9-3.1 7-7 7s-7-3.1-7-7V186h-77.9c-.4 0-.8 0-1.2-.1h-.1c.1 1.1.2 2.2.2 3.3v44.9h48.8c20.9 0 38 17 38 38v186.8c0 9.1-3.2 17.4-8.6 24H444c11.8 0 21.4-9.6 21.4-21.4v-331c-.1-11.8-9.7-21.4-21.5-21.4zm-129.3 0V64.3h64.5v44.8h-64.5zM46.7 271.9v186.8c0 13.3 10.7 24 24 24h33.6V247.9H70.7c-13.3 0-24 10.7-24 24z"
@@ -120,7 +120,7 @@ export const SalaryIcon = (props)=>{
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <g stroke="#000">
+      <g stroke="currentColor">
         <circle cx={12} cy={12} r={10} strokeWidth={2} />
         <path
           d="M15 9.947C14.5 9.3 13.8 8.5 12 8.5S9 9.514 9 9.947c0 .434.068.98 1 1.553.752.462 2.668.544 3.5 1 1.179.647 1.35 1.32 1.35 1.552 0 .632-1.432 1.433-2.85 1.448-1.464.015-2.5-.8-3-1.448"
@@ -157,14 +157,14 @@ export const UserManageIcon =(props)=>{
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 32 32"
       xmlSpace="preserve"
-      fill="#000"
+      fill="currentColor"
       {...props}
     >
       <g id="SVGRepo_iconCarrier">
         <style />
         <path
           d="M19 20.5a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zm-3-4.449V5.5a.5.5 0 00-1 0v10.551c.166-.019.329-.051.5-.051s.334.032.5.051zm-1 8.898V26.5a.5.5 0 001 0v-1.551c-.166.019-.329.051-.5.051s-.334-.032-.5-.051zm9-6V26.5a.5.5 0 001 0v-7.551c-.166.019-.329.051-.5.051s-.334-.032-.5-.051zm1-8.898V5.5a.5.5 0 00-1 0v4.551c.166-.019.329-.051.5-.051s.334.032.5.051zm-18-3V5.5a.5.5 0 00-1 0v1.551c.166-.019.329-.051.5-.051s.334.032.5.051zm-1 8.898V26.5a.5.5 0 001 0V15.949c-.166.019-.329.051-.5.051s-.334-.032-.5-.051zM6.5 8a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm18 3a3.5 3.5 0 100 7 3.5 3.5 0 000-7z"
-          fill="#0b1719"
+          fill="currentColor"
         />
       </g>
     </svg>
@@ -179,7 +179,7 @@ export const DashboardIcon =(props)=>{
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <g stroke="#000" strokeWidth={2} strokeLinecap="round">
+      <g stroke="currentColor" strokeWidth={2} strokeLinecap="round">
         <path d="M13 12a1 1 0 011-1h5a1 1 0 011 1v7a1 1 0 01-1 1h-5a1 1 0 01-1-1v-7zM4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM13 5a1 1 0 011-1h5a1 1 0 011 1v2a1 1 0 01-1 1h-5a1 1 0 01-1-1V5z" />
       </g>
     </svg>
