@@ -34,8 +34,8 @@ const DEFAULT_FORM = {
   name: '',
   code: '',
   address: '',
-  lat: 6.57095,
-  lng: 101.29689,
+  lat: 0,
+  lng: 0,
   radius: 100,
 }
 
