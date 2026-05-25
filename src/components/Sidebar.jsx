@@ -36,13 +36,11 @@ function Sidebar() {
   useEffect(() => {
     const checkIfMobile = () => {
       const mobile = window.innerWidth < 768
-
       setIsMobile(mobile)
       setIsExpanded(!mobile)
     }
 
     checkIfMobile()
-
     window.addEventListener('resize', checkIfMobile)
 
     return () => window.removeEventListener('resize', checkIfMobile)
@@ -97,7 +95,6 @@ function Sidebar() {
       icon: <DashboardIcon className="w-5 h-5" />,
       label: 'Dashboard',
     },
-
     ...(user?.role === 'OWNER'
       ? [
           {
@@ -107,7 +104,6 @@ function Sidebar() {
           },
         ]
       : []),
-
     {
       to: '/admin/Work-time-record',
       icon: <FileCheck className="w-5 h-5" />,
@@ -140,9 +136,9 @@ function Sidebar() {
       )}
 
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => setIsExpanded((prev) => !prev)}
         className="
-          fixed top-4 left-4 z-[9999]
+          fixed top-4 left-4 z-[10000]
           p-3 rounded-2xl
           bg-[#FFB347]
           text-[#1B1F3B]
@@ -156,7 +152,9 @@ function Sidebar() {
 
       <aside
         className={`
-          fixed md:sticky top-0 left-0 z-[9999] h-screen shrink-0
+          fixed md:sticky top-0 left-0 z-[9999]
+          h-dvh max-h-dvh shrink-0
+          overflow-hidden
           bg-[#11152E]/95
           backdrop-blur-xl
           border-r border-white/5
@@ -168,18 +166,34 @@ function Sidebar() {
               ? 'w-64 translate-x-0'
               : 'w-0 md:w-64 -translate-x-full md:translate-x-0'
           }
-
-          overflow-hidden
         `}
       >
-        <div className="flex items-center h-20 px-6">
-          <h1 className="text-3xl font-bold tracking-wide">
-            <span className="text-[#00B8A9]">Work</span>
-            <span className="text-white">Pal</span>
-          </h1>
+        <div className="flex h-20 shrink-0 items-center px-6">
+          {isExpanded && (
+            <h1 className="ml-10 text-3xl font-bold tracking-wide md:ml-0">
+              <span className="text-[#00B8A9]">Work</span>
+              <span className="text-white">Pal</span>
+            </h1>
+          )}
         </div>
 
-        <div className="flex-1 px-3 space-y-2">
+        <nav
+          className="
+            min-h-0 flex-1 px-3 space-y-2
+            overflow-y-auto overflow-x-hidden
+            overscroll-contain
+            pb-24 pr-2
+
+            [scrollbar-width:thin]
+            [scrollbar-color:rgba(255,179,71,0.45)_transparent]
+
+            [&::-webkit-scrollbar]:w-1.5
+            [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full
+            [&::-webkit-scrollbar-thumb]:bg-[#FFB347]/30
+            hover:[&::-webkit-scrollbar-thumb]:bg-[#FFB347]/60
+          "
+        >
           {allMenuItems.map((item) => {
             const active = location.pathname === item.to
 
@@ -196,8 +210,8 @@ function Sidebar() {
                   ${
                     active
                       ? `
-                        bg-gradient-to-r 
-                        from-[#FFB347]/15 
+                        bg-gradient-to-r
+                        from-[#FFB347]/15
                         to-transparent
                         text-[#FFB347]
                         border border-[#FFB347]/10
@@ -217,7 +231,7 @@ function Sidebar() {
 
                 <div
                   className={`
-                    transition-all duration-300
+                    shrink-0 transition-all duration-300
 
                     ${
                       active
@@ -232,7 +246,7 @@ function Sidebar() {
                 {isExpanded && (
                   <span
                     className={`
-                      text-sm font-medium tracking-wide
+                      text-sm font-medium tracking-wide whitespace-nowrap
                       transition-all duration-300
 
                       ${
@@ -248,11 +262,19 @@ function Sidebar() {
               </Link>
             )
           })}
-        </div>
+        </nav>
 
-        <div className="p-4 border-t border-white/5">
+        <div
+          className="
+            shrink-0
+            p-4
+            pb-[max(1rem,env(safe-area-inset-bottom))]
+            border-t border-white/5
+            bg-[#11152E]/95
+          "
+        >
           {isExpanded && (
-            <div className="text-xs text-white/30 tracking-wide">
+            <div className="mb-2 text-xs text-white/30 tracking-wide">
               WorkPal v1.0
             </div>
           )}
@@ -268,7 +290,7 @@ function Sidebar() {
               transition-all
             "
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-5 h-5 shrink-0" />
 
             {isExpanded && <span className="text-sm font-medium">Logout</span>}
           </button>

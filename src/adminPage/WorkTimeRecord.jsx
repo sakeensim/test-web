@@ -224,7 +224,7 @@ const WorkTimeRecordPage = () => {
   }
 
   return (
-    <div className="min-h-screen w-full p-4 sm:p-6">
+    <div className="min-h-dvh w-full p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#FFB347]">

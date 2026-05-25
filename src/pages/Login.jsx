@@ -42,8 +42,8 @@ function Login() {
   }
 
   return (
-  <div className="min-h-screen bg-[#1B1F3B] text-white">
-    <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-8">
+  <div className="min-h-dvh bg-[#1B1F3B] text-white">
+    <div className="mx-auto flex min-h-dvh max-w-6xl items-center justify-center px-4 py-8">
       <div className="grid w-full gap-8 lg:grid-cols-[1fr_420px] lg:items-center">
         <div className="hidden lg:block">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#FFB347]">

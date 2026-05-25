@@ -133,7 +133,7 @@ function HolidayPage() {
     : 'ยังไม่ได้เลือกวัน'
 
   return (
-    <div className="min-h-screen w-full p-4 sm:p-6">
+    <div className="min-h-dvh w-full p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
