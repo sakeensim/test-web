@@ -39,6 +39,14 @@ const DEFAULT_FORM = {
   radius: 100,
 }
 
+const DEFAULT_POSITION_FORM = {
+  name: '',
+  description: '',
+  checkInTime: '08:00',
+  checkOutTime: '17:00',
+  maxDayOffPerMonth: 6,
+}
+
 function SearchControl({ onSelect }) {
   const map = useMap()
 
@@ -110,17 +118,16 @@ function OrganizationSettings() {
   const [form, setForm] = useState(DEFAULT_FORM)
   const [editingId, setEditingId] = useState(null)
   const [loading, setLoading] = useState(false)
+
   const [positions, setPositions] = useState([])
+  const [positionForm, setPositionForm] = useState(DEFAULT_POSITION_FORM)
+  const [editingPositionId, setEditingPositionId] = useState(null)
+  const [positionLoading, setPositionLoading] = useState(false)
+
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false)
-
-  const [positionForm, setPositionForm] = useState({
-    name: '',
-    description: '',
-    checkInTime: '08:00',
-    checkOutTime: '17:00',
-    maxDayOffPerMonth: 6,
-  })
-
+  const [isPositionModalOpen, setIsPositionModalOpen] = useState(false)
+  const [deletePositionId, setDeletePositionId] = useState(null)
+  const [deleteBranchId, setDeleteBranchId] = useState(null)
   const position = {
     lat: Number(form.lat) || DEFAULT_FORM.lat,
     lng: Number(form.lng) || DEFAULT_FORM.lng,
@@ -275,29 +282,71 @@ function OrganizationSettings() {
     }
   }
 
-  const createPosition = async (e) => {
+  const resetPositionForm = () => {
+    setPositionForm(DEFAULT_POSITION_FORM)
+    setEditingPositionId(null)
+  }
+
+  const openAddPositionModal = () => {
+    resetPositionForm()
+    setIsPositionModalOpen(true)
+  }
+
+  const submitPosition = async (e) => {
     e.preventDefault()
 
     try {
-      await axios.post(`${API_URL}/admin/position`, positionForm, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      setPositionLoading(true)
 
-      createAlert('success', 'Create position success')
+      const payload = {
+        name: positionForm.name,
+        description: positionForm.description,
+        checkInTime: positionForm.checkInTime,
+        checkOutTime: positionForm.checkOutTime,
+        maxDayOffPerMonth: Number(positionForm.maxDayOffPerMonth),
+      }
 
-      setPositionForm({
-        name: '',
-        description: '',
-        checkInTime: '08:00',
-        checkOutTime: '17:00',
-        maxDayOffPerMonth: 6,
-      })
+      if (editingPositionId) {
+        await axios.patch(`${API_URL}/admin/position/${editingPositionId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
+        createAlert('success', 'Update position success')
+      } else {
+        await axios.post(`${API_URL}/admin/position`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        createAlert('success', 'Create position success')
+      }
+
+      resetPositionForm()
+      setIsPositionModalOpen(false)
       fetchPositions()
     } catch (error) {
       console.log(error)
-      createAlert('error', 'Create position failed')
+      createAlert(
+        'error',
+        error.response?.data?.message ||
+          (editingPositionId ? 'Update position failed' : 'Create position failed')
+      )
+    } finally {
+      setPositionLoading(false)
     }
+  }
+
+  const editPosition = (position) => {
+    setEditingPositionId(position.id)
+
+    setPositionForm({
+      name: position.name || '',
+      description: position.description || '',
+      checkInTime: position.checkInTime || '08:00',
+      checkOutTime: position.checkOutTime || '17:00',
+      maxDayOffPerMonth: position.maxDayOffPerMonth ?? 6,
+    })
+
+    setIsPositionModalOpen(true)
   }
 
   const deletePosition = async (id) => {
@@ -307,6 +356,12 @@ function OrganizationSettings() {
       })
 
       createAlert('success', 'Delete position success')
+
+      if (editingPositionId === id) {
+        resetPositionForm()
+      }
+
+      setDeletePositionId(null)
       fetchPositions()
     } catch (error) {
       console.log(error)
@@ -392,7 +447,7 @@ function OrganizationSettings() {
                       </button>
 
                       <button
-                        onClick={() => hdlDelete(branch.id)}
+                        onClick={() => setDeleteBranchId(branch.id)}
                         className="flex-1 rounded-2xl bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-400/20"
                       >
                         Delete
@@ -406,141 +461,273 @@ function OrganizationSettings() {
 
           <div className="rounded-[2rem] border border-white/10 bg-[#11152E]/90 p-5 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">Positions</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-white">Positions</h2>
 
-              <span className="rounded-xl bg-[#00B8A9]/10 px-3 py-1 text-sm font-semibold text-[#00B8A9]">
-                {positions.length}
-              </span>
-            </div>
-
-            <form
-              onSubmit={createPosition}
-              className="mt-5 space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5"
-            >
-              <input
-                value={positionForm.name}
-                onChange={(e) =>
-                  setPositionForm({
-                    ...positionForm,
-                    name: e.target.value,
-                  })
-                }
-                placeholder="Position name"
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none placeholder:text-white/30"
-              />
-
-              <input
-                value={positionForm.description}
-                onChange={(e) =>
-                  setPositionForm({
-                    ...positionForm,
-                    description: e.target.value,
-                  })
-                }
-                placeholder="Description"
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none placeholder:text-white/30"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="mb-2 text-xs text-white/40">Check-in Time</p>
-
-                  <input
-                    type="time"
-                    value={positionForm.checkInTime}
-                    onChange={(e) =>
-                      setPositionForm({
-                        ...positionForm,
-                        checkInTime: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none"
-                  />
-                </div>
-
-                <div>
-                  <p className="mb-2 text-xs text-white/40">Check-out Time</p>
-
-                  <input
-                    type="time"
-                    value={positionForm.checkOutTime}
-                    onChange={(e) =>
-                      setPositionForm({
-                        ...positionForm,
-                        checkOutTime: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none"
-                  />
-                </div>
-
-                <div>
-                  <p className="mb-2 text-xs text-white/40">
-                    Max Day Off Per Month
-                  </p>
-
-                  <input
-                    type="number"
-                    min="0"
-                    value={positionForm.maxDayOffPerMonth}
-                    onChange={(e) =>
-                      setPositionForm({
-                        ...positionForm,
-                        maxDayOffPerMonth: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white outline-none"
-                  />
-                </div>
+                <span className="rounded-xl bg-[#00B8A9]/10 px-3 py-1 text-sm font-semibold text-[#00B8A9]">
+                  {positions.length}
+                </span>
               </div>
 
               <button
-                type="submit"
-                className="h-14 w-full rounded-2xl bg-[#FFB347] text-lg font-bold text-[#1B1F3B] transition hover:scale-[1.01]"
+                onClick={openAddPositionModal}
+                className="rounded-xl bg-[#FFB347] px-4 py-2 text-sm font-bold text-[#1B1F3B] transition hover:scale-[1.02]"
               >
-                Add Position
+                + Add
               </button>
-            </form>
+            </div>
 
-            <div className="mt-6 max-h-[500px] space-y-4 overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,179,71,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#FFB347]/30">
-              {positions.map((position) => (
-                <div
-                  key={position.id}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
-                >
-                  <h3 className="text-xl font-bold text-white">
-                    {position.name}
-                  </h3>
-
-                  <p className="mt-1 text-sm text-white/40">
-                    {position.description || 'No description'}
-                  </p>
-
-                  <div className="mt-5 flex flex-wrap items-stretch gap-2">
-                    <div className="flex h-12 items-center rounded-xl bg-[#00B8A9]/10 px-4 text-sm font-semibold text-[#00B8A9]">
-                      IN {position.checkInTime}
-                    </div>
-
-                    <div className="flex h-12 items-center rounded-xl bg-[#FFB347]/10 px-4 text-sm font-semibold text-[#FFB347]">
-                      OUT {position.checkOutTime}
-                    </div>
-
-                    <div className="flex h-12 items-center rounded-xl bg-blue-400/10 px-4 text-sm font-semibold text-blue-300">
-                      DAY OFF {position.maxDayOffPerMonth}
-                    </div>
-
-                    <button
-                      onClick={() => deletePosition(position.id)}
-                      className="flex h-12 items-center rounded-xl bg-red-400/10 px-4 text-sm font-semibold text-red-300 transition hover:bg-red-400/20"
-                    >
-                      Delete
-                    </button>
-                  </div>
+            <div className="mt-5 max-h-[500px] space-y-4 overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,179,71,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#FFB347]/30">
+              {positions.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-white/30">
+                  ยังไม่มีตำแหน่ง
                 </div>
-              ))}
+              ) : (
+                positions.map((position) => (
+                  <div
+                    key={position.id}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+                  >
+                    <h3 className="text-xl font-bold text-white">
+                      {position.name}
+                    </h3>
+
+                    <p className="mt-1 text-sm text-white/40">
+                      {position.description || 'No description'}
+                    </p>
+
+                    <div className="mt-5 flex flex-wrap items-stretch gap-2">
+                      <div className="flex h-12 items-center rounded-xl bg-[#00B8A9]/10 px-4 text-sm font-semibold text-[#00B8A9]">
+                        IN {position.checkInTime}
+                      </div>
+
+                      <div className="flex h-12 items-center rounded-xl bg-[#FFB347]/10 px-4 text-sm font-semibold text-[#FFB347]">
+                        OUT {position.checkOutTime}
+                      </div>
+
+                      <div className="flex h-12 items-center rounded-xl bg-blue-400/10 px-4 text-sm font-semibold text-blue-300">
+                        DAY OFF {position.maxDayOffPerMonth}
+                      </div>
+
+                      <button
+                        onClick={() => editPosition(position)}
+                        className="flex h-12 items-center rounded-xl bg-white/[0.06] px-4 text-sm font-semibold text-white/70 transition hover:bg-white/[0.1]"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => setDeletePositionId(position.id)}
+                        className="flex h-12 items-center rounded-xl bg-red-400/10 px-4 text-sm font-semibold text-red-300 transition hover:bg-red-400/20"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
+        {deleteBranchId && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#11152E] p-6 shadow-2xl">
+              <h2 className="text-2xl font-bold text-white">Delete Branch</h2>
+
+              <p className="mt-3 text-white/50">
+                Are you sure you want to delete this branch?
+              </p>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setDeleteBranchId(null)}
+                  className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 font-semibold text-white/70 transition hover:bg-white/[0.08]"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={async () => {
+                    await hdlDelete(deleteBranchId)
+                    setDeleteBranchId(null)
+                  }}
+                  className="flex-1 rounded-2xl bg-red-400/15 px-4 py-4 font-bold text-red-300 transition hover:bg-red-400/25"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {isPositionModalOpen && (
+          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+            <div className="flex min-h-dvh items-start justify-center py-6">
+              <form
+                onSubmit={submitPosition}
+                className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-[#11152E] p-6 shadow-2xl"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.25em] text-[#FFB347]">
+                      Position Setup
+                    </p>
+
+                    <h2 className="mt-2 text-3xl font-bold text-white">
+                      {editingPositionId ? 'Edit Position' : 'Add Position'}
+                    </h2>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPositionModalOpen(false)
+                      resetPositionForm()
+                    }}
+                    className="rounded-xl bg-white/5 px-4 py-2 text-white/70 transition hover:bg-white/10"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  <input
+                    value={positionForm.name}
+                    onChange={(e) =>
+                      setPositionForm({
+                        ...positionForm,
+                        name: e.target.value,
+                      })
+                    }
+                    placeholder="Position name"
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
+                  />
+
+                  <input
+                    value={positionForm.description}
+                    onChange={(e) =>
+                      setPositionForm({
+                        ...positionForm,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Description"
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
+                  />
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-xs text-white/40">
+                        Check-in Time
+                      </p>
+
+                      <input
+                        type="time"
+                        value={positionForm.checkInTime}
+                        onChange={(e) =>
+                          setPositionForm({
+                            ...positionForm,
+                            checkInTime: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-xs text-white/40">
+                        Check-out Time
+                      </p>
+
+                      <input
+                        type="time"
+                        value={positionForm.checkOutTime}
+                        onChange={(e) =>
+                          setPositionForm({
+                            ...positionForm,
+                            checkOutTime: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs text-white/40">
+                      Max Day Off Per Month
+                    </p>
+
+                    <input
+                      type="number"
+                      min="0"
+                      value={positionForm.maxDayOffPerMonth}
+                      onChange={(e) =>
+                        setPositionForm({
+                          ...positionForm,
+                          maxDayOffPerMonth: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPositionModalOpen(false)
+                      resetPositionForm()
+                    }}
+                    className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 font-semibold text-white/70 transition hover:bg-white/[0.08]"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={positionLoading}
+                    className="flex-1 rounded-2xl bg-[#FFB347] px-4 py-4 font-bold text-[#1B1F3B] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {positionLoading
+                      ? 'Saving...'
+                      : editingPositionId
+                        ? 'Update Position'
+                        : 'Add Position'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {deletePositionId && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#11152E] p-6 shadow-2xl">
+              <h2 className="text-2xl font-bold text-white">Delete Position</h2>
+
+              <p className="mt-3 text-white/50">
+                Are you sure you want to delete this position?
+              </p>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setDeletePositionId(null)}
+                  className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 font-semibold text-white/70 transition hover:bg-white/[0.08]"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={() => deletePosition(deletePositionId)}
+                  className="flex-1 rounded-2xl bg-red-400/15 px-4 py-4 font-bold text-red-300 transition hover:bg-red-400/25"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isBranchModalOpen && (
           <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">

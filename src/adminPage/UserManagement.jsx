@@ -200,14 +200,14 @@ function UserManagement() {
 
   if (loading) {
     return (
-      <div className="flex h-dvh items-center justify-center">
+      <div className="flex h-[calc(100dvh-120px)] items-center justify-center">
         Loading...
       </div>
     )
   }
 
   return (
-    <div className="min-h-dvh w-full p-4 sm:p-6">
+    <div className="w-full p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
@@ -233,9 +233,24 @@ function UserManagement() {
         </div>
 
         <div className="rounded-[2rem] border border-white/10 bg-[#11152E]/90 shadow-2xl backdrop-blur-xl">
-          <div className="overflow-x-auto">
+          <div
+            className="
+              max-h-[calc(100dvh-220px)]
+              overflow-auto
+
+              [scrollbar-width:thin]
+              [scrollbar-color:rgba(255,179,71,0.45)_transparent]
+
+              [&::-webkit-scrollbar]:h-1.5
+              [&::-webkit-scrollbar]:w-1.5
+              [&::-webkit-scrollbar-track]:bg-transparent
+              [&::-webkit-scrollbar-thumb]:rounded-full
+              [&::-webkit-scrollbar-thumb]:bg-[#FFB347]/30
+              hover:[&::-webkit-scrollbar-thumb]:bg-[#FFB347]/60
+            "
+          >
             <table className="w-full min-w-[1250px]">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-[#11152E]">
                 <tr className="border-b border-white/10 text-left">
                   {[
                     'Profile',

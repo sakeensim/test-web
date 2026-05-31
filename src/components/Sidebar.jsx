@@ -138,6 +138,7 @@ function Sidebar() {
       <button
         onClick={() => setIsExpanded((prev) => !prev)}
         className="
+          md:hidden
           fixed top-4 left-4 z-[10000]
           p-3 rounded-2xl
           bg-[#FFB347]
