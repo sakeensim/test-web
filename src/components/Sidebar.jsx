@@ -55,32 +55,32 @@ function Sidebar() {
     {
       to: '/user',
       icon: <ProfileIcon className="w-5 h-5" />,
-      label: 'Profile',
+      label: 'โปรไฟล์',
     },
     {
       to: '/user/check-in',
       icon: <CheckinIcon className="w-5 h-5" />,
-      label: 'Check-In',
+      label: 'เข้างาน',
     },
     {
       to: '/user/check-out',
       icon: <CheckoutIcon className="w-5 h-5" />,
-      label: 'Check-Out',
+      label: 'ออกงาน',
     },
     {
       to: '/user/advancd-salary',
       icon: <SalaryIcon className="w-5 h-5" />,
-      label: 'Advance Salary',
+      label: 'ขอเบิก',
     },
     {
       to: '/user/day-off',
       icon: <DayoffIcon className="w-5 h-5" />,
-      label: 'Day-Off',
+      label: 'วันหยุด',
     },
     {
       to: '/user/history',
       icon: <HistoryIcon className="w-5 h-5" />,
-      label: 'History',
+      label: 'ประวัติ',
     },
   ]
 
