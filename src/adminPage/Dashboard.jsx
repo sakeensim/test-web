@@ -3,7 +3,7 @@ import { User, Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import axios from 'axios'
 import useAuthStore from '../store/auth-store'
 import API_URL from '../utils/api'
-
+import { createPortal } from 'react-dom'
 function Dashboard() {
   const [employees, setEmployees] = useState([])
   const [branches, setBranches] = useState([])
@@ -82,6 +82,19 @@ function Dashboard() {
     })
   }
 
+  const calculateDuration = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return '-'
+
+    const diffMs = new Date(checkOut).getTime() - new Date(checkIn).getTime()
+
+    if (diffMs <= 0) return '-'
+
+    const hours = Math.floor(diffMs / (1000 * 60 * 60))
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+
+    return `${hours}h ${minutes}m`
+  }
+
   const getMonthName = (date) => {
     return date.toLocaleString('th-TH', {
       month: 'long',
@@ -145,7 +158,7 @@ function Dashboard() {
   }, [employees, filter, selectedBranch])
 
   return (
-    <div className="min-h-screen w-full p-4 sm:p-6">
+    <div className="min-h-dvh w-full p-4 sm:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -328,18 +341,21 @@ function Dashboard() {
         </div>
       </div>
 
-      {selectedEmployee && (
-        <EmployeeModal
-          employee={selectedEmployee}
-          token={token}
-          onClose={() => setSelectedEmployee(null)}
-          formatCurrency={formatCurrency}
-          formatDate={formatDate}
-          formatTime={formatTime}
-          getMonthName={getMonthName}
-          getEmployeeStats={getEmployeeStats}
-        />
-      )}
+      {selectedEmployee &&
+        createPortal(
+          <EmployeeModal
+            employee={selectedEmployee}
+            token={token}
+            onClose={() => setSelectedEmployee(null)}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
+            formatTime={formatTime}
+            calculateDuration={calculateDuration}
+            getMonthName={getMonthName}
+            getEmployeeStats={getEmployeeStats}
+          />,
+          document.body
+        )}
     </div>
   )
 }
@@ -351,6 +367,7 @@ function EmployeeModal({
   formatCurrency,
   formatDate,
   formatTime,
+  calculateDuration,
   getMonthName,
   getEmployeeStats,
 }) {
@@ -418,11 +435,11 @@ function EmployeeModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-[2rem] border border-white/10 bg-[#11152E] p-5 shadow-2xl"
+        className="max-h-[88vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] border border-white/10 bg-[#11152E] p-5 shadow-2xl"
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -541,6 +558,7 @@ function EmployeeModal({
               logs={attendanceLogs}
               formatDate={formatDate}
               formatTime={formatTime}
+              calculateDuration={calculateDuration}
             />
           ) : activeTab === 'dayoff' ? (
             <DayOffLogs logs={dayOffs} formatDate={formatDate} />
@@ -557,7 +575,7 @@ function EmployeeModal({
   )
 }
 
-function AttendanceLogs({ logs, formatDate, formatTime }) {
+function AttendanceLogs({ logs, formatDate, formatTime, calculateDuration }) {
   if (!logs.length) return <EmptyLog text="No attendance logs" />
 
   const getStatusStyle = (status) => {
@@ -577,7 +595,7 @@ function AttendanceLogs({ logs, formatDate, formatTime }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[980px] w-full">
+      <table className="min-w-[1080px] w-full">
         <thead>
           <tr className="border-b border-white/10 text-left">
             {[
@@ -587,6 +605,7 @@ function AttendanceLogs({ logs, formatDate, formatTime }) {
               'Late',
               'Check Out',
               'Early Out',
+              'Duration',
               'Note',
             ].map((head) => (
               <th
@@ -669,6 +688,12 @@ function AttendanceLogs({ logs, formatDate, formatTime }) {
                 ) : (
                   <span className="text-white/30">-</span>
                 )}
+              </td>
+
+              <td className="whitespace-nowrap px-4 py-3 font-bold text-white">
+                {log.status === 'PRESENT'
+                  ? calculateDuration(log.checkIn, log.checkOut)
+                  : '-'}
               </td>
 
               <td className="px-4 py-3">
