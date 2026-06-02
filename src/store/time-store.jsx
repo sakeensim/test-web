@@ -6,11 +6,16 @@ const timeStore = create((set) => ({
   time: {},
   date: {},
 
-  actionCheckIn: async (token, latitude, longitude, note) => {
+  actionCheckIn: async (token, latitude, longitude, note, shiftId) => {
     try {
       const res = await axios.post(
         `${API_URL}/user/check-in`,
-        { latitude, longitude,note},
+        {
+          latitude,
+          longitude,
+          note,
+          shiftId,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -28,27 +33,31 @@ const timeStore = create((set) => ({
     }
   },
 
-  actionCheckOut: async (token, latitude, longitude,note) => {
-  try {
-    const res = await axios.patch(
-      `${API_URL}/user/check-out`,
-      { latitude, longitude,note },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
+  actionCheckOut: async (token, latitude, longitude, note) => {
+    try {
+      const res = await axios.patch(
+        `${API_URL}/user/check-out`,
+        {
+          latitude,
+          longitude,
+          note,
         },
-      }
-    )
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
 
-    set({ time: res.data.data })
-    console.log('Check-Out Response:', res.data)
+      set({ time: res.data.data })
+      console.log('Check-Out Response:', res.data)
 
-    return res.data
-  } catch (error) {
-    console.error('Check-Out Error:', error)
-    throw error
-  }
-},
+      return res.data
+    } catch (error) {
+      console.error('Check-Out Error:', error)
+      throw error
+    }
+  },
 
   actionDayOff: async (token, date, reason, status) => {
     const res = await axios.post(

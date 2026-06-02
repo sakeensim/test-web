@@ -81,10 +81,7 @@ const WorkTimeRecordPage = () => {
           const hasValidCheckIn =
             record.checkIn && !isNaN(new Date(record.checkIn).getTime())
 
-          const hasValidCheckOut =
-            record.checkOut && !isNaN(new Date(record.checkOut).getTime())
-
-          return hasValidCheckIn && hasValidCheckOut
+          return hasValidCheckIn
         })
         .map((record) => {
           const employeeId =
@@ -134,11 +131,7 @@ const WorkTimeRecordPage = () => {
   }
 
   const formatTime = (dateTimeStr) => {
-    if (
-      !dateTimeStr ||
-      typeof dateTimeStr !== 'string' ||
-      isNaN(Date.parse(dateTimeStr))
-    ) {
+    if (!dateTimeStr || isNaN(Date.parse(dateTimeStr))) {
       return 'N/A'
     }
 
@@ -146,9 +139,9 @@ const WorkTimeRecordPage = () => {
   }
 
   const calculateDuration = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return 'กำลังทำงาน'
+
     if (
-      !checkIn ||
-      !checkOut ||
       isNaN(new Date(checkIn).getTime()) ||
       isNaN(new Date(checkOut).getTime())
     ) {
@@ -198,7 +191,15 @@ const WorkTimeRecordPage = () => {
     )
   }
 
-  const getEarlyBadge = (minutes) => {
+  const getEarlyBadge = (minutes, hasCheckOut) => {
+    if (!hasCheckOut) {
+      return (
+        <span className={`${badgeBase} bg-sky-400/10 text-sky-300`}>
+          รอ Check-out
+        </span>
+      )
+    }
+
     const early = Number(minutes || 0)
 
     if (early <= 0) {
@@ -214,6 +215,32 @@ const WorkTimeRecordPage = () => {
         className={`${badgeBase} min-w-[125px] bg-orange-400/10 text-orange-300`}
       >
         ออกก่อน {early} นาที
+      </span>
+    )
+  }
+
+  const getOTBadge = (minutes, hasCheckOut) => {
+    if (!hasCheckOut) {
+      return (
+        <span className={`${badgeBase} bg-white/[0.06] text-white/40`}>
+          -
+        </span>
+      )
+    }
+
+    const ot = Number(minutes || 0)
+
+    if (ot <= 0) {
+      return (
+        <span className={`${badgeBase} bg-white/[0.06] text-white/45`}>
+          0 นาที
+        </span>
+      )
+    }
+
+    return (
+      <span className={`${badgeBase} bg-cyan-400/10 text-cyan-300`}>
+        OT {ot} นาที
       </span>
     )
   }
@@ -237,7 +264,7 @@ const WorkTimeRecordPage = () => {
           </h1>
 
           <p className="mt-2 text-white/45">
-            ตรวจสอบประวัติการเข้างาน ออกงาน สาย ออกก่อนเวลา และหมายเหตุ
+            ตรวจสอบประวัติการเข้างาน ออกงาน กะทำงาน OT และหมายเหตุ
           </p>
         </div>
 
@@ -315,16 +342,18 @@ const WorkTimeRecordPage = () => {
             </div>
           ) : (
             <div className="max-h-[70vh] w-full overflow-auto">
-              <table className="min-w-[1400px] w-full">
+              <table className="min-w-[1650px] w-full">
                 <thead className="sticky top-0 z-10 bg-[#11152E]">
                   <tr className="border-b border-white/10 text-left">
                     {[
                       'Employee',
                       'Date',
+                      'Shift',
                       'Check In',
                       'Late',
                       'Check Out',
                       'Early Out',
+                      'OT',
                       'Duration',
                       'Check-in Note',
                       'Check-out Note',
@@ -343,8 +372,11 @@ const WorkTimeRecordPage = () => {
                   {records.map((record, index) => {
                     const employeeId = record.normalizedEmployeeId
                     const employeeName = getEmployeeName(employeeId)
+                    const hasCheckOut =
+                      record.checkOut &&
+                      !isNaN(new Date(record.checkOut).getTime())
 
-                    const uniqueKey = `${employeeId || 'unknown'}-${record.date}-${record.checkIn}-${record.checkOut}-${index}`
+                    const uniqueKey = `${employeeId || 'unknown'}-${record.date}-${record.checkIn}-${record.checkOut || 'active'}-${index}`
 
                     return (
                       <tr
@@ -362,6 +394,12 @@ const WorkTimeRecordPage = () => {
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
+                          <span className={`${badgeBase} bg-cyan-400/10 text-cyan-300`}>
+                            {record.shift?.name || '-'}
+                          </span>
+                        </td>
+
+                        <td className="whitespace-nowrap px-6 py-4">
                           <span
                             className={`${timeBadgeBase} bg-[#00B8A9]/10 text-[#00B8A9]`}
                           >
@@ -374,15 +412,27 @@ const WorkTimeRecordPage = () => {
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
-                          <span
-                            className={`${timeBadgeBase} bg-[#FFB347]/10 text-[#FFB347]`}
-                          >
-                            {formatTime(record.checkOut)}
-                          </span>
+                          {hasCheckOut ? (
+                            <span
+                              className={`${timeBadgeBase} bg-[#FFB347]/10 text-[#FFB347]`}
+                            >
+                              {formatTime(record.checkOut)}
+                            </span>
+                          ) : (
+                            <span
+                              className={`${timeBadgeBase} bg-sky-400/10 text-sky-300`}
+                            >
+                              ยังไม่ Check-out
+                            </span>
+                          )}
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
-                          {getEarlyBadge(record.earlyLeaveMinutes)}
+                          {getEarlyBadge(record.earlyLeaveMinutes, hasCheckOut)}
+                        </td>
+
+                        <td className="whitespace-nowrap px-6 py-4">
+                          {getOTBadge(record.otMinutes, hasCheckOut)}
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4 font-bold text-white">

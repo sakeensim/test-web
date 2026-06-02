@@ -42,10 +42,21 @@ const DEFAULT_FORM = {
 const DEFAULT_POSITION_FORM = {
   name: '',
   description: '',
-  checkInTime: '08:00',
-  checkOutTime: '17:00',
   maxDayOffPerMonth: 6,
 }
+
+const createEmptyShift = (overrides = {}) => ({
+  id: null,
+  name: '',
+  checkInTime: '08:00',
+  checkOutTime: '17:00',
+  isDefault: false,
+  isActive: true,
+  allowOT: false,
+  otStartAfter: 0,
+  otCapMinutes: '',
+  ...overrides,
+})
 
 function SearchControl({ onSelect }) {
   const map = useMap()
@@ -121,6 +132,10 @@ function OrganizationSettings() {
 
   const [positions, setPositions] = useState([])
   const [positionForm, setPositionForm] = useState(DEFAULT_POSITION_FORM)
+  const [positionShifts, setPositionShifts] = useState([
+    createEmptyShift({ isDefault: true }),
+  ])
+  const [deletedShiftIds, setDeletedShiftIds] = useState([])
   const [editingPositionId, setEditingPositionId] = useState(null)
   const [positionLoading, setPositionLoading] = useState(false)
 
@@ -128,6 +143,7 @@ function OrganizationSettings() {
   const [isPositionModalOpen, setIsPositionModalOpen] = useState(false)
   const [deletePositionId, setDeletePositionId] = useState(null)
   const [deleteBranchId, setDeleteBranchId] = useState(null)
+
   const position = {
     lat: Number(form.lat) || DEFAULT_FORM.lat,
     lng: Number(form.lng) || DEFAULT_FORM.lng,
@@ -139,7 +155,7 @@ function OrganizationSettings() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      setPositions(res.data.data || [])
+      setPositions(res.data.data || res.data.result || [])
     } catch (error) {
       console.log(error)
     }
@@ -284,6 +300,8 @@ function OrganizationSettings() {
 
   const resetPositionForm = () => {
     setPositionForm(DEFAULT_POSITION_FORM)
+    setPositionShifts([createEmptyShift({ isDefault: true })])
+    setDeletedShiftIds([])
     setEditingPositionId(null)
   }
 
@@ -292,17 +310,124 @@ function OrganizationSettings() {
     setIsPositionModalOpen(true)
   }
 
+  const normalizeShiftName = (shift, index) => {
+    const baseName = positionForm.name.trim() || 'position'
+
+    if (shift.name?.trim()) return shift.name.trim()
+
+    return index === 0 ? `${baseName}_shift` : `${baseName}_shift_${index + 1}`
+  }
+
+  const validatePosition = () => {
+    if (!positionForm.name.trim()) {
+      createAlert('error', 'กรุณากรอกชื่อตำแหน่ง')
+      return false
+    }
+
+    if (positionShifts.length === 0) {
+      createAlert('error', 'กรุณาเพิ่มกะอย่างน้อย 1 กะ')
+      return false
+    }
+
+    const activeShifts = positionShifts.filter((shift) => shift.isActive)
+
+    if (activeShifts.length === 0) {
+      createAlert('error', 'ต้องมีกะที่ active อย่างน้อย 1 กะ')
+      return false
+    }
+
+    const defaultShift = positionShifts.find((shift) => shift.isDefault)
+
+    if (!defaultShift) {
+      createAlert('error', 'กรุณาเลือก default shift')
+      return false
+    }
+
+    if (!defaultShift.isActive) {
+      createAlert('error', 'Default shift ต้องเป็น active')
+      return false
+    }
+
+    const names = positionShifts.map((shift, index) =>
+      normalizeShiftName(shift, index).toLowerCase()
+    )
+
+    const hasDuplicate = names.some((name, index) => names.indexOf(name) !== index)
+
+    if (hasDuplicate) {
+      createAlert('error', 'ชื่อกะซ้ำกัน กรุณาเปลี่ยนชื่อกะ')
+      return false
+    }
+
+    return true
+  }
+
+  const buildShiftPayload = (shift, positionId, index) => ({
+    name: normalizeShiftName(shift, index),
+    checkInTime: shift.checkInTime,
+    checkOutTime: shift.checkOutTime,
+    positionId: Number(positionId),
+    isDefault: Boolean(shift.isDefault),
+    isActive: Boolean(shift.isActive),
+    allowOT: Boolean(shift.allowOT),
+    otStartAfter: Number(shift.otStartAfter || 0),
+    otCapMinutes:
+      shift.otCapMinutes === '' || shift.otCapMinutes === null
+        ? null
+        : Number(shift.otCapMinutes),
+  })
+
+  const syncShifts = async (positionId, defaultShiftId = null) => {
+    for (const shiftId of deletedShiftIds) {
+      try {
+        await axios.delete(`${API_URL}/admin/shift/${shiftId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      } catch (error) {
+        await axios.patch(
+          `${API_URL}/admin/shift/${shiftId}`,
+          { isActive: false },
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+      }
+    }
+
+    for (let index = 0; index < positionShifts.length; index++) {
+      const shift = positionShifts[index]
+      const payload = buildShiftPayload(shift, positionId, index)
+
+      if (shift.id) {
+        await axios.patch(`${API_URL}/admin/shift/${shift.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      } else if (defaultShiftId && shift.isDefault) {
+        await axios.patch(`${API_URL}/admin/shift/${defaultShiftId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      } else {
+        await axios.post(`${API_URL}/admin/shift`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      }
+    }
+  }
+
   const submitPosition = async (e) => {
     e.preventDefault()
+
+    if (!validatePosition()) return
 
     try {
       setPositionLoading(true)
 
+      const defaultShift =
+        positionShifts.find((shift) => shift.isDefault) || positionShifts[0]
+
       const payload = {
         name: positionForm.name,
         description: positionForm.description,
-        checkInTime: positionForm.checkInTime,
-        checkOutTime: positionForm.checkOutTime,
+        checkInTime: defaultShift.checkInTime,
+        checkOutTime: defaultShift.checkOutTime,
         maxDayOffPerMonth: Number(positionForm.maxDayOffPerMonth),
       }
 
@@ -311,11 +436,18 @@ function OrganizationSettings() {
           headers: { Authorization: `Bearer ${token}` },
         })
 
+        await syncShifts(editingPositionId)
+
         createAlert('success', 'Update position success')
       } else {
-        await axios.post(`${API_URL}/admin/position`, payload, {
+        const res = await axios.post(`${API_URL}/admin/position`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         })
+
+        const createdPosition = res.data.data || res.data.result || res.data.position
+        const defaultShiftFromServer = res.data.defaultShift
+
+        await syncShifts(createdPosition.id, defaultShiftFromServer?.id)
 
         createAlert('success', 'Create position success')
       }
@@ -341,11 +473,48 @@ function OrganizationSettings() {
     setPositionForm({
       name: position.name || '',
       description: position.description || '',
-      checkInTime: position.checkInTime || '08:00',
-      checkOutTime: position.checkOutTime || '17:00',
       maxDayOffPerMonth: position.maxDayOffPerMonth ?? 6,
     })
 
+    const mappedShifts =
+      position.shifts?.length > 0
+        ? position.shifts.map((shift) =>
+            createEmptyShift({
+              id: shift.id,
+              name: shift.name || '',
+              checkInTime: shift.checkInTime || '08:00',
+              checkOutTime: shift.checkOutTime || '17:00',
+              isDefault: Boolean(shift.isDefault),
+              isActive: Boolean(shift.isActive),
+              allowOT: Boolean(shift.allowOT),
+              otStartAfter: Number(shift.otStartAfter || 0),
+              otCapMinutes:
+                shift.otCapMinutes === null || shift.otCapMinutes === undefined
+                  ? ''
+                  : String(shift.otCapMinutes),
+            })
+          )
+        : [
+            createEmptyShift({
+              name: `${position.name}_shift`,
+              checkInTime: position.checkInTime || '08:00',
+              checkOutTime: position.checkOutTime || '17:00',
+              isDefault: true,
+            }),
+          ]
+
+    const hasDefault = mappedShifts.some((shift) => shift.isDefault)
+
+    setPositionShifts(
+      hasDefault
+        ? mappedShifts
+        : mappedShifts.map((shift, index) => ({
+            ...shift,
+            isDefault: index === 0,
+          }))
+    )
+
+    setDeletedShiftIds([])
     setIsPositionModalOpen(true)
   }
 
@@ -369,490 +538,769 @@ function OrganizationSettings() {
     }
   }
 
-  return (
-    <div className="min-h-dvh w-full">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-end justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#FFB347]">
-              Admin Panel
-            </p>
+  const addShift = () => {
+    setPositionShifts((prev) => [
+      ...prev,
+      createEmptyShift({
+        checkInTime: prev[0]?.checkInTime || '08:00',
+        checkOutTime: prev[0]?.checkOutTime || '17:00',
+      }),
+    ])
+  }
 
-            <h1 className="mt-2 text-4xl font-bold text-white">
-              Organization Settings
-            </h1>
+  const updateShift = (index, key, value) => {
+    setPositionShifts((prev) =>
+      prev.map((shift, i) =>
+        i === index
+          ? {
+              ...shift,
+              [key]: value,
+            }
+          : shift
+      )
+    )
+  }
 
-            <p className="mt-2 text-white/40">
-              จัดการสาขา ตำแหน่งงาน และเวลาการทำงานของพนักงาน
-            </p>
+  const setDefaultShift = (index) => {
+    setPositionShifts((prev) =>
+      prev.map((shift, i) => ({
+        ...shift,
+        isDefault: i === index,
+        isActive: i === index ? true : shift.isActive,
+      }))
+    )
+  }
+
+  const toggleShiftActive = (index) => {
+    const targetShift = positionShifts[index]
+
+    if (targetShift.isDefault && targetShift.isActive) {
+      createAlert('error', 'ไม่สามารถ inactive default shift ได้')
+      return
+    }
+
+    updateShift(index, 'isActive', !targetShift.isActive)
+  }
+
+  const removeShift = (index) => {
+    const targetShift = positionShifts[index]
+
+    if (targetShift.isDefault) {
+      createAlert('error', 'กรุณาเลือก default shift อื่นก่อนลบ')
+      return
+    }
+
+    if (positionShifts.length <= 1) {
+      createAlert('error', 'ต้องมีกะอย่างน้อย 1 กะ')
+      return
+    }
+
+    if (targetShift.id) {
+      setDeletedShiftIds((prev) => [...prev, targetShift.id])
+    }
+
+    setPositionShifts((prev) => prev.filter((_, i) => i !== index))
+  }
+    return (
+  <div className="min-h-dvh w-full px-4 py-5 sm:px-6">
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#FFB347]">
+          Admin Panel
+        </p>
+
+        <h1 className="mt-1 text-2xl font-bold text-white">
+          Organization Settings
+        </h1>
+
+        <p className="mt-1 text-sm text-white/35">
+          จัดการสาขา ตำแหน่ง และกะทำงาน
+        </p>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-3xl border border-white/10 bg-[#11152E]/90 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-white">Branches</h2>
+              <span className="rounded-full bg-[#FFB347]/10 px-2 py-0.5 text-[11px] font-bold text-[#FFB347]">
+                {branches.length}
+              </span>
+            </div>
+
+            <button
+              onClick={openAddBranchModal}
+              className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
+            >
+              + Add
+            </button>
+          </div>
+
+          <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+            {branches.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/30">
+                ยังไม่มีสาขา
+              </div>
+            ) : (
+              branches.map((branch) => (
+                <div
+                  key={branch.id}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-bold text-white">
+                        {branch.name}
+                      </h3>
+
+                      <p className="mt-0.5 text-xs text-white/35">
+                        {branch.code}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[10px] font-bold text-cyan-300">
+                      {branch.radius}m
+                    </span>
+                  </div>
+
+                  <p className="mt-2 line-clamp-1 text-xs text-white/40">
+                    {branch.address || 'No address'}
+                  </p>
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => hdlEdit(branch)}
+                      className="flex-1 rounded-xl bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white/65"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => setDeleteBranchId(branch.id)}
+                      className="flex-1 rounded-xl bg-red-400/10 px-3 py-2 text-xs font-semibold text-red-300"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        <div className="grid items-start gap-6 xl:grid-cols-2">
-          <div className="rounded-[2rem] border border-white/10 bg-[#11152E]/90 p-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold text-white">Branches</h2>
-
-                <span className="rounded-xl bg-[#FFB347]/10 px-3 py-1 text-sm font-semibold text-[#FFB347]">
-                  {branches.length}
-                </span>
-              </div>
-
-              <button
-                onClick={openAddBranchModal}
-                className="rounded-xl bg-[#FFB347] px-4 py-2 text-sm font-bold text-[#1B1F3B] transition hover:scale-[1.02]"
-              >
-                + Add
-              </button>
+        <div className="rounded-3xl border border-white/10 bg-[#11152E]/90 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-white">Positions</h2>
+              <span className="rounded-full bg-[#00B8A9]/10 px-2 py-0.5 text-[11px] font-bold text-[#00B8A9]">
+                {positions.length}
+              </span>
             </div>
 
-            <div className="mt-5 max-h-[500px] space-y-4 overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,179,71,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#FFB347]/30">
-              {branches.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-white/30">
-                  ยังไม่มีสาขา
-                </div>
-              ) : (
-                branches.map((branch) => (
+            <button
+              onClick={openAddPositionModal}
+              className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
+            >
+              + Add
+            </button>
+          </div>
+
+          <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+            {positions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/30">
+                ยังไม่มีตำแหน่ง
+              </div>
+            ) : (
+              positions.map((position) => {
+                const activeShifts =
+                  position.shifts?.filter((shift) => shift.isActive) || []
+
+                const defaultShift =
+                  position.shifts?.find((shift) => shift.isDefault) ||
+                  activeShifts[0] ||
+                  null
+
+                return (
                   <div
-                    key={branch.id}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-[#FFB347]/40"
+                    key={position.id}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-xl font-bold text-white">
-                          {branch.name}
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-bold text-white">
+                          {position.name}
                         </h3>
 
-                        <p className="mt-1 text-sm text-white/40">
-                          {branch.code}
+                        <p className="mt-0.5 line-clamp-1 text-xs text-white/35">
+                          {position.description || 'No description'}
                         </p>
                       </div>
 
-                      <div className="rounded-xl bg-[#00B8A9]/10 px-3 py-1 text-xs font-semibold text-[#00B8A9]">
-                        {branch.radius}m
-                      </div>
+                      <span className="rounded-full bg-blue-400/10 px-2 py-1 text-[10px] font-bold text-blue-300">
+                        {position.maxDayOffPerMonth} OFF
+                      </span>
                     </div>
 
-                    <p className="mt-4 text-sm leading-relaxed text-white/50">
-                      {branch.address || 'No address'}
-                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="rounded-xl bg-[#FFB347]/10 px-2.5 py-1 text-[11px] font-bold text-[#FFB347]">
+                        {defaultShift?.checkInTime || '--:--'} -{' '}
+                        {defaultShift?.checkOutTime || '--:--'}
+                      </span>
 
-                    <div className="mt-5 flex gap-3">
-                      <button
-                        onClick={() => hdlEdit(branch)}
-                        className="flex-1 rounded-2xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/[0.08]"
-                      >
-                        Edit
-                      </button>
+                      <span className="rounded-xl bg-white/[0.05] px-2.5 py-1 text-[11px] font-semibold text-white/50">
+                        {(position.shifts || []).length} shifts
+                      </span>
 
-                      <button
-                        onClick={() => setDeleteBranchId(branch.id)}
-                        className="flex-1 rounded-2xl bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-400/20"
-                      >
-                        Delete
-                      </button>
+                      {defaultShift?.allowOT && (
+                        <span className="rounded-xl bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold text-cyan-300">
+                          OT
+                        </span>
+                      )}
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-[#11152E]/90 p-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold text-white">Positions</h2>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(position.shifts || []).slice(0, 3).map((shift) => (
+                        <span
+                          key={shift.id}
+                          className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                            shift.isDefault
+                              ? 'bg-[#FFB347]/15 text-[#FFB347]'
+                              : shift.isActive
+                                ? 'bg-white/[0.05] text-white/55'
+                                : 'bg-white/[0.03] text-white/25'
+                          }`}
+                        >
+                          {shift.checkInTime}-{shift.checkOutTime}
+                        </span>
+                      ))}
 
-                <span className="rounded-xl bg-[#00B8A9]/10 px-3 py-1 text-sm font-semibold text-[#00B8A9]">
-                  {positions.length}
-                </span>
-              </div>
+                      {(position.shifts?.length || 0) > 3 && (
+                        <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-semibold text-white/40">
+                          +{position.shifts.length - 3}
+                        </span>
+                      )}
+                    </div>
 
-              <button
-                onClick={openAddPositionModal}
-                className="rounded-xl bg-[#FFB347] px-4 py-2 text-sm font-bold text-[#1B1F3B] transition hover:scale-[1.02]"
-              >
-                + Add
-              </button>
-            </div>
-
-            <div className="mt-5 max-h-[500px] space-y-4 overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,179,71,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#FFB347]/30">
-              {positions.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center text-white/30">
-                  ยังไม่มีตำแหน่ง
-                </div>
-              ) : (
-                positions.map((position) => (
-                  <div
-                    key={position.id}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
-                  >
-                    <h3 className="text-xl font-bold text-white">
-                      {position.name}
-                    </h3>
-
-                    <p className="mt-1 text-sm text-white/40">
-                      {position.description || 'No description'}
-                    </p>
-
-                    <div className="mt-5 flex flex-wrap items-stretch gap-2">
-                      <div className="flex h-12 items-center rounded-xl bg-[#00B8A9]/10 px-4 text-sm font-semibold text-[#00B8A9]">
-                        IN {position.checkInTime}
-                      </div>
-
-                      <div className="flex h-12 items-center rounded-xl bg-[#FFB347]/10 px-4 text-sm font-semibold text-[#FFB347]">
-                        OUT {position.checkOutTime}
-                      </div>
-
-                      <div className="flex h-12 items-center rounded-xl bg-blue-400/10 px-4 text-sm font-semibold text-blue-300">
-                        DAY OFF {position.maxDayOffPerMonth}
-                      </div>
-
+                    <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => editPosition(position)}
-                        className="flex h-12 items-center rounded-xl bg-white/[0.06] px-4 text-sm font-semibold text-white/70 transition hover:bg-white/[0.1]"
+                        className="flex-1 rounded-xl bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white/65"
                       >
                         Edit
                       </button>
 
                       <button
                         onClick={() => setDeletePositionId(position.id)}
-                        className="flex h-12 items-center rounded-xl bg-red-400/10 px-4 text-sm font-semibold text-red-300 transition hover:bg-red-400/20"
+                        className="flex-1 rounded-xl bg-red-400/10 px-3 py-2 text-xs font-semibold text-red-300"
                       >
                         Delete
                       </button>
                     </div>
                   </div>
-                ))
-              )}
+                )
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {deleteBranchId && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#11152E] p-5">
+            <h2 className="text-lg font-bold text-white">Delete Branch</h2>
+
+            <p className="mt-2 text-sm text-white/45">
+              ลบสาขานี้ใช่หรือไม่
+            </p>
+
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setDeleteBranchId(null)}
+                className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={async () => {
+                  await hdlDelete(deleteBranchId)
+                  setDeleteBranchId(null)
+                }}
+                className="flex-1 rounded-xl bg-red-400/15 px-4 py-3 text-sm font-bold text-red-300"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
-        {deleteBranchId && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#11152E] p-6 shadow-2xl">
-              <h2 className="text-2xl font-bold text-white">Delete Branch</h2>
+      )}
 
-              <p className="mt-3 text-white/50">
-                Are you sure you want to delete this branch?
-              </p>
+      {deletePositionId && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#11152E] p-5">
+            <h2 className="text-lg font-bold text-white">Delete Position</h2>
 
-              <div className="mt-6 flex gap-3">
-                <button
-                  onClick={() => setDeleteBranchId(null)}
-                  className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 font-semibold text-white/70 transition hover:bg-white/[0.08]"
-                >
-                  Cancel
-                </button>
+            <p className="mt-2 text-sm text-white/45">
+              ลบตำแหน่งนี้ใช่หรือไม่
+            </p>
 
-                <button
-                  onClick={async () => {
-                    await hdlDelete(deleteBranchId)
-                    setDeleteBranchId(null)
-                  }}
-                  className="flex-1 rounded-2xl bg-red-400/15 px-4 py-4 font-bold text-red-300 transition hover:bg-red-400/25"
-                >
-                  Delete
-                </button>
-              </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setDeletePositionId(null)}
+                className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={() => deletePosition(deletePositionId)}
+                className="flex-1 rounded-xl bg-red-400/15 px-4 py-3 text-sm font-bold text-red-300"
+              >
+                Delete
+              </button>
             </div>
           </div>
-        )}
-        {isPositionModalOpen && (
-          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
-            <div className="flex min-h-dvh items-start justify-center py-6">
-              <form
-                onSubmit={submitPosition}
-                className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-[#11152E] p-6 shadow-2xl"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-[#FFB347]">
-                      Position Setup
-                    </p>
+        </div>
+      )}
 
-                    <h2 className="mt-2 text-3xl font-bold text-white">
-                      {editingPositionId ? 'Edit Position' : 'Add Position'}
-                    </h2>
-                  </div>
+      {isPositionModalOpen && (
+        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+          <div className="flex min-h-dvh items-start justify-center py-6">
+            <form
+              onSubmit={submitPosition}
+              className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#11152E] p-5"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.25em] text-[#FFB347]">
+                    Position Setup
+                  </p>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPositionModalOpen(false)
-                      resetPositionForm()
-                    }}
-                    className="rounded-xl bg-white/5 px-4 py-2 text-white/70 transition hover:bg-white/10"
-                  >
-                    Close
-                  </button>
+                  <h2 className="mt-1 text-2xl font-bold text-white">
+                    {editingPositionId ? 'Edit Position' : 'Add Position'}
+                  </h2>
                 </div>
 
-                <div className="mt-6 space-y-4">
-                  <input
-                    value={positionForm.name}
-                    onChange={(e) =>
-                      setPositionForm({
-                        ...positionForm,
-                        name: e.target.value,
-                      })
-                    }
-                    placeholder="Position name"
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
-                  />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPositionModalOpen(false)
+                    resetPositionForm()
+                  }}
+                  className="rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-white/60"
+                >
+                  Close
+                </button>
+              </div>
 
-                  <input
-                    value={positionForm.description}
-                    onChange={(e) =>
-                      setPositionForm({
-                        ...positionForm,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="Description"
-                    className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
-                  />
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-2 text-xs text-white/40">
-                        Check-in Time
-                      </p>
-
-                      <input
-                        type="time"
-                        value={positionForm.checkInTime}
-                        onChange={(e) =>
-                          setPositionForm({
-                            ...positionForm,
-                            checkInTime: e.target.value,
-                          })
-                        }
-                        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <p className="mb-2 text-xs text-white/40">
-                        Check-out Time
-                      </p>
-
-                      <input
-                        type="time"
-                        value={positionForm.checkOutTime}
-                        onChange={(e) =>
-                          setPositionForm({
-                            ...positionForm,
-                            checkOutTime: e.target.value,
-                          })
-                        }
-                        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs text-white/40">
-                      Max Day Off Per Month
+              <div className="mt-5 grid gap-4 lg:grid-cols-[320px_1fr]">
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-white/35">
+                      Position Info
                     </p>
 
                     <input
-                      type="number"
-                      min="0"
-                      value={positionForm.maxDayOffPerMonth}
+                      value={positionForm.name}
                       onChange={(e) =>
                         setPositionForm({
                           ...positionForm,
-                          maxDayOffPerMonth: e.target.value,
+                          name: e.target.value,
                         })
                       }
-                      className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none"
+                      placeholder="Position name"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
                     />
+
+                    <input
+                      value={positionForm.description}
+                      onChange={(e) =>
+                        setPositionForm({
+                          ...positionForm,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Description"
+                      className="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                    />
+
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-xs text-white/40">
+                        Max Day Off / Month
+                      </p>
+
+                      <input
+                        type="number"
+                        min="0"
+                        value={positionForm.maxDayOffPerMonth}
+                        onChange={(e) =>
+                          setPositionForm({
+                            ...positionForm,
+                            maxDayOffPerMonth: e.target.value,
+                          })
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#00B8A9]/15 bg-[#00B8A9]/10 p-4">
+                    <p className="text-sm font-bold text-[#00B8A9]">
+                      Shift Rules
+                    </p>
+
+                    <p className="mt-1.5 text-xs leading-relaxed text-white/45">
+                      กะที่ active จะถูกใช้ตอนพนักงาน Check-in และคำนวณสาย/OT
+                    </p>
                   </div>
                 </div>
 
-                <div className="mt-6 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPositionModalOpen(false)
-                      resetPositionForm()
-                    }}
-                    className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 font-semibold text-white/70 transition hover:bg-white/[0.08]"
-                  >
-                    Cancel
-                  </button>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/35">
+                        Shifts
+                      </p>
 
-                  <button
-                    type="submit"
-                    disabled={positionLoading}
-                    className="flex-1 rounded-2xl bg-[#FFB347] px-4 py-4 font-bold text-[#1B1F3B] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {positionLoading
-                      ? 'Saving...'
-                      : editingPositionId
-                        ? 'Update Position'
-                        : 'Add Position'}
-                  </button>
+                      <h3 className="mt-0.5 text-lg font-bold text-white">
+                        {positionShifts.length} Shift
+                      </h3>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={addShift}
+                      className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  <div className="max-h-[500px] space-y-3 overflow-y-auto pr-1">
+                    {positionShifts.map((shift, index) => (
+                      <div
+                        key={shift.id || index}
+                        className={`rounded-2xl border p-3 ${
+                          shift.isDefault
+                            ? 'border-[#FFB347]/35 bg-[#FFB347]/5'
+                            : shift.isActive
+                              ? 'border-white/10 bg-[#11152E]/50'
+                              : 'border-white/5 bg-white/[0.02] opacity-60'
+                        }`}
+                      >
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-white">
+                              Shift #{index + 1}
+                            </p>
+
+                            <p className="text-xs text-white/35">
+                              {shift.isDefault
+                                ? 'Default'
+                                : shift.isActive
+                                  ? 'Active'
+                                  : 'Inactive'}
+                            </p>
+                          </div>
+
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setDefaultShift(index)}
+                              className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
+                                shift.isDefault
+                                  ? 'bg-[#FFB347] text-[#1B1F3B]'
+                                  : 'bg-white/[0.06] text-white/55'
+                              }`}
+                            >
+                              Default
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleShiftActive(index)}
+                              className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
+                                shift.isActive
+                                  ? 'bg-[#00B8A9]/10 text-[#00B8A9]'
+                                  : 'bg-white/[0.06] text-white/40'
+                              }`}
+                            >
+                              {shift.isActive ? 'Active' : 'Inactive'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => removeShift(index)}
+                              className="rounded-lg bg-red-400/10 px-2.5 py-1.5 text-[11px] font-bold text-red-300"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <input
+                            value={shift.name}
+                            onChange={(e) =>
+                              updateShift(index, 'name', e.target.value)
+                            }
+                            placeholder={
+                              index === 0
+                                ? `${positionForm.name || 'position'}_shift`
+                                : `${positionForm.name || 'position'}_shift_${
+                                    index + 1
+                                  }`
+                            }
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 sm:col-span-2"
+                          />
+
+                          <input
+                            type="time"
+                            value={shift.checkInTime}
+                            onChange={(e) =>
+                              updateShift(
+                                index,
+                                'checkInTime',
+                                e.target.value
+                              )
+                            }
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none"
+                          />
+
+                          <input
+                            type="time"
+                            value={shift.checkOutTime}
+                            onChange={(e) =>
+                              updateShift(
+                                index,
+                                'checkOutTime',
+                                e.target.value
+                              )
+                            }
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none"
+                          />
+
+                          <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={shift.allowOT}
+                              onChange={(e) =>
+                                updateShift(
+                                  index,
+                                  'allowOT',
+                                  e.target.checked
+                                )
+                              }
+                              className="h-4 w-4 accent-[#FFB347]"
+                            />
+
+                            <span className="text-xs font-semibold text-white/65">
+                              Allow OT
+                            </span>
+                          </label>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={shift.otStartAfter}
+                              onChange={(e) =>
+                                updateShift(
+                                  index,
+                                  'otStartAfter',
+                                  e.target.value
+                                )
+                              }
+                              placeholder="OT after"
+                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25"
+                            />
+
+                            <input
+                              type="number"
+                              min="0"
+                              value={shift.otCapMinutes}
+                              onChange={(e) =>
+                                updateShift(
+                                  index,
+                                  'otCapMinutes',
+                                  e.target.value
+                                )
+                              }
+                              placeholder="OT cap"
+                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </form>
-            </div>
-          </div>
-        )}
+              </div>
 
-        {deletePositionId && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-[#11152E] p-6 shadow-2xl">
-              <h2 className="text-2xl font-bold text-white">Delete Position</h2>
-
-              <p className="mt-3 text-white/50">
-                Are you sure you want to delete this position?
-              </p>
-
-              <div className="mt-6 flex gap-3">
+              <div className="mt-5 flex gap-2">
                 <button
-                  onClick={() => setDeletePositionId(null)}
-                  className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 font-semibold text-white/70 transition hover:bg-white/[0.08]"
+                  type="button"
+                  onClick={() => {
+                    setIsPositionModalOpen(false)
+                    resetPositionForm()
+                  }}
+                  className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
                 >
                   Cancel
                 </button>
 
                 <button
-                  onClick={() => deletePosition(deletePositionId)}
-                  className="flex-1 rounded-2xl bg-red-400/15 px-4 py-4 font-bold text-red-300 transition hover:bg-red-400/25"
+                  type="submit"
+                  disabled={positionLoading}
+                  className="flex-1 rounded-xl bg-[#FFB347] px-4 py-3 text-sm font-bold text-[#1B1F3B] disabled:opacity-60"
                 >
-                  Delete
+                  {positionLoading
+                    ? 'Saving...'
+                    : editingPositionId
+                      ? 'Update'
+                      : 'Add Position'}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {isBranchModalOpen && (
-          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
-            <div className="flex min-h-dvh items-start justify-center py-6">
-              <div className="w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#11152E] shadow-2xl lg:max-w-6xl">
-                <div className="grid max-h-[calc(100dvh-3rem)] overflow-y-auto lg:grid-cols-[1fr_420px]">
-                  <div className="relative h-[420px] lg:h-auto lg:min-h-[700px]">
-                    <MapContainer
-                      center={[position.lat, position.lng]}
-                      zoom={16}
-                      className="h-full w-full"
-                    >
-                      <TileLayer
-                        attribution="&copy; OpenStreetMap contributors"
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
+      {isBranchModalOpen && (
+        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+          <div className="flex min-h-dvh items-start justify-center py-6">
+            <form
+              onSubmit={hdlSubmit}
+              className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#11152E] p-5"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.25em] text-[#FFB347]">
+                    Branch Setup
+                  </p>
 
-                      <SearchControl onSelect={hdlSelectLocation} />
-                      <ChangeMapView position={position} />
+                  <h2 className="mt-1 text-2xl font-bold text-white">
+                    {editingId ? 'Edit Branch' : 'Add Branch'}
+                  </h2>
+                </div>
 
-                      <LocationPicker
-                        position={position}
-                        radius={form.radius}
-                        onSelect={hdlSelectLocation}
-                      />
-                    </MapContainer>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBranchModalOpen(false)
+                    setEditingId(null)
+                    setForm(DEFAULT_FORM)
+                  }}
+                  className="rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-white/60"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-[300px_1fr]">
+                <div className="space-y-3">
+                  <input
+                    name="name"
+                    value={form.name}
+                    onChange={hdlChange}
+                    placeholder="Branch name"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                  />
+
+                  <input
+                    name="code"
+                    value={form.code}
+                    onChange={hdlChange}
+                    placeholder="Branch code"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                  />
+
+                  <textarea
+                    name="address"
+                    value={form.address}
+                    onChange={hdlChange}
+                    placeholder="Address"
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                  />
+
+                  <input
+                    name="radius"
+                    type="number"
+                    min="10"
+                    value={form.radius}
+                    onChange={hdlChange}
+                    placeholder="Radius"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                  />
+
+                  <div className="rounded-2xl border border-[#00B8A9]/15 bg-[#00B8A9]/10 p-3">
+                    <p className="text-xs font-bold text-[#00B8A9]">
+                      GPS Location
+                    </p>
+
+                    <p className="mt-1 text-xs text-white/45">
+                      Lat {Number(form.lat || 0).toFixed(5)} · Lng{' '}
+                      {Number(form.lng || 0).toFixed(5)}
+                    </p>
                   </div>
+                </div>
 
-                  <form onSubmit={hdlSubmit} className="flex flex-col p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm uppercase tracking-[0.25em] text-[#FFB347]">
-                          Branch Setup
-                        </p>
+                <div className="overflow-hidden rounded-2xl border border-white/10">
+                  <MapContainer
+                    center={[position.lat, position.lng]}
+                    zoom={15}
+                    scrollWheelZoom
+                    className="h-[460px] w-full"
+                  >
+                    <TileLayer
+                      attribution="&copy; OpenStreetMap contributors"
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
 
-                        <h2 className="mt-2 text-3xl font-bold text-white">
-                          {editingId ? 'Edit Branch' : 'Add Branch'}
-                        </h2>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsBranchModalOpen(false)}
-                        className="rounded-xl bg-white/5 px-4 py-2 text-white/70 transition hover:bg-white/10"
-                      >
-                        Close
-                      </button>
-                    </div>
-
-                    <div className="mt-6 space-y-4">
-                      <input
-                        name="name"
-                        value={form.name}
-                        onChange={hdlChange}
-                        placeholder="Branch name"
-                        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
-                      />
-
-                      <input
-                        name="code"
-                        value={form.code}
-                        onChange={hdlChange}
-                        placeholder="Branch code"
-                        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
-                      />
-
-                      <textarea
-                        name="address"
-                        value={form.address}
-                        onChange={hdlChange}
-                        placeholder="Address"
-                        rows={4}
-                        className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
-                      />
-
-                      <div className="rounded-2xl border border-[#00B8A9]/20 bg-[#00B8A9]/10 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-[#00B8A9]">
-                          Selected Location
-                        </p>
-
-                        <p className="mt-2 text-sm text-white/70">
-                          Lat {Number(form.lat).toFixed(5)}
-                        </p>
-
-                        <p className="text-sm text-white/70">
-                          Lng {Number(form.lng).toFixed(5)}
-                        </p>
-                      </div>
-
-                      <input
-                        name="radius"
-                        type="number"
-                        value={form.radius}
-                        onChange={hdlChange}
-                        placeholder="Radius"
-                        className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-white outline-none placeholder:text-white/30"
-                      />
-                    </div>
-
-                    <div className="mt-6 flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsBranchModalOpen(false)}
-                        className="flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 font-semibold text-white/70 transition hover:bg-white/[0.08]"
-                      >
-                        Cancel
-                      </button>
-
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex-1 rounded-2xl bg-[#FFB347] px-4 py-4 font-bold text-[#1B1F3B] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {loading ? 'Saving...' : 'Confirm & Save'}
-                      </button>
-                    </div>
-                  </form>
+                    <SearchControl onSelect={hdlSelectLocation} />
+                    <ChangeMapView position={position} />
+                    <LocationPicker
+                      position={position}
+                      radius={form.radius}
+                      onSelect={hdlSelectLocation}
+                    />
+                  </MapContainer>
                 </div>
               </div>
-            </div>
+
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBranchModalOpen(false)
+                    setEditingId(null)
+                    setForm(DEFAULT_FORM)
+                  }}
+                  className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 rounded-xl bg-[#FFB347] px-4 py-3 text-sm font-bold text-[#1B1F3B] disabled:opacity-60"
+                >
+                  {loading
+                    ? 'Saving...'
+                    : editingId
+                      ? 'Update Branch'
+                      : 'Add Branch'}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
-  )
+  </div>
+)
 }
 
 export default OrganizationSettings

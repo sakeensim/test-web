@@ -91,6 +91,9 @@ function UserHistoryPage() {
   if (!data) return null
 
   const attendanceLogs = data.logs.attendanceLogs || []
+  const totalOTMinutes =
+    data.summary.otMinutes ||
+    attendanceLogs.reduce((sum, log) => sum + Number(log.otMinutes || 0), 0)
 
   return (
     <div className="min-h-dvh w-full p-4 sm:p-6">
@@ -155,11 +158,12 @@ function UserHistoryPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-7">
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-8">
             <Mini title="ทำงาน" value={`${data.summary.workingDays} วัน`} color="text-[#00B8A9]" />
             <Mini title="ขาด" value={`${data.summary.absentDays || 0} วัน`} color="text-red-300" />
             <Mini title="สาย" value={`${data.summary.lateDays} วัน`} color="text-red-300" />
             <Mini title="ออกก่อน" value={`${data.summary.earlyDays} วัน`} color="text-orange-300" />
+            <Mini title="OT" value={`${totalOTMinutes} นาที`} color="text-cyan-300" />
             <Mini title="ลา" value={`${data.summary.dayOffs} วัน`} color="text-white" />
             <Mini title="เบิกล่วงหน้า" value={formatMoney(data.summary.advanceTaken)} color="text-[#FFB347]" />
             <Mini title="เงินเดือนสุทธิ" value={formatMoney(data.summary.finalSalary)} color="text-[#00B8A9]" />
@@ -189,16 +193,18 @@ function UserHistoryPage() {
 
           <div className="mt-4 max-h-[420px] overflow-auto rounded-2xl bg-white/[0.03] p-3">
             {activeTab === 'check' && (
-              <table className="min-w-[920px] w-full">
+              <table className="min-w-[1180px] w-full">
                 <thead>
                   <tr className="border-b border-white/10 text-left">
                     {[
                       'Date',
                       'Status',
+                      'Shift',
                       'Check In',
                       'Late',
                       'Check Out',
                       'Early',
+                      'OT',
                       'Note',
                     ].map((h) => (
                       <th
@@ -232,6 +238,12 @@ function UserHistoryPage() {
                           </span>
                         </td>
 
+                        <td className="whitespace-nowrap px-4 py-3 text-cyan-300">
+                          {log.status === 'PRESENT'
+                            ? log.shiftName || '-'
+                            : '-'}
+                        </td>
+
                         <td className="whitespace-nowrap px-4 py-3 text-[#00B8A9]">
                           {log.status === 'PRESENT'
                             ? formatTime(log.checkIn)
@@ -256,6 +268,12 @@ function UserHistoryPage() {
                             : '-'}
                         </td>
 
+                        <td className="whitespace-nowrap px-4 py-3 text-cyan-300">
+                          {log.status === 'PRESENT'
+                            ? `${log.otMinutes || 0}m`
+                            : '-'}
+                        </td>
+
                         <td className="px-4 py-3 text-white/50">
                           <p className="max-w-[180px] truncate">
                             {log.checkInNote ||
@@ -270,7 +288,7 @@ function UserHistoryPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="7" className="py-10 text-center text-white/35">
+                      <td colSpan="9" className="py-10 text-center text-white/35">
                         No attendance logs
                       </td>
                     </tr>

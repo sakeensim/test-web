@@ -87,21 +87,32 @@ function UserManagement() {
   }
 
   const updateSalary = async (id) => {
-    try {
-      await axios.patch(
-        `${API_URL}/admin/update-salary`,
-        { id, baseSalary: newSalary },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+  try {
+    await axios.patch(
+      `${API_URL}/user/update-salary/${id}`,
+      {
+        baseSalary: Number(newSalary),
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
 
-      createAlert('success', 'Salary updated successfully')
-      fetchEmployees()
-      setEditingSalaryId(null)
-    } catch (error) {
-      console.error('Error updating salary:', error)
-      createAlert('error', 'Failed to update salary')
-    }
+    createAlert('success', 'Salary updated successfully')
+
+    fetchEmployees()
+    setEditingSalaryId(null)
+  } catch (error) {
+    console.error('Error updating salary:', error)
+
+    createAlert(
+      'error',
+      error.response?.data?.message || 'Failed to update salary'
+    )
   }
+}
 
   const handleRoleChange = async (id, newRole) => {
     try {

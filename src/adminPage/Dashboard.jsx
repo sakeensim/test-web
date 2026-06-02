@@ -4,6 +4,7 @@ import axios from 'axios'
 import useAuthStore from '../store/auth-store'
 import API_URL from '../utils/api'
 import { createPortal } from 'react-dom'
+
 function Dashboard() {
   const [employees, setEmployees] = useState([])
   const [branches, setBranches] = useState([])
@@ -95,6 +96,24 @@ function Dashboard() {
     return `${hours}h ${minutes}m`
   }
 
+  const formatOTHours = (minutes) => {
+    const totalMinutes = Number(minutes || 0)
+    const hours = Math.floor(totalMinutes / 60)
+    const mins = totalMinutes % 60
+
+    if (totalMinutes <= 0) return '0 ชม.'
+
+    if (mins === 0) {
+      return `${hours} ชม.`
+    }
+
+    if (hours === 0) {
+      return `${mins} นาที`
+    }
+
+    return `${hours} ชม. ${mins} นาที`
+  }
+
   const getMonthName = (date) => {
     return date.toLocaleString('th-TH', {
       month: 'long',
@@ -120,6 +139,10 @@ function Dashboard() {
       ? attendanceLogs.filter((log) => Number(log.earlyLeaveMinutes || 0) > 0).length
       : timeLogs.filter((log) => Number(log.earlyLeaveMinutes || 0) > 0).length
 
+    const otMinutes = attendanceLogs.length
+      ? attendanceLogs.reduce((sum, log) => sum + Number(log.otMinutes || 0), 0)
+      : timeLogs.reduce((sum, log) => sum + Number(log.otMinutes || 0), 0)
+
     const approvedDayOffs = dayOffs.filter(
       (item) => item.status === 'APPROVED'
     ).length
@@ -132,6 +155,7 @@ function Dashboard() {
       workingDays,
       lateDays,
       earlyDays,
+      otMinutes,
       approvedDayOffs,
       absentDays: Number(employee.absentDays || 0),
     }
@@ -233,7 +257,7 @@ function Dashboard() {
                 <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/10 border-t-[#00B8A9]" />
               </div>
             ) : (
-              <table className="min-w-[1250px] w-full">
+              <table className="min-w-[1350px] w-full">
                 <thead className="sticky top-0 z-10 bg-[#11152E]">
                   <tr className="border-b border-white/10 text-left">
                     {[
@@ -243,6 +267,7 @@ function Dashboard() {
                       'Absent',
                       'Late',
                       'Early',
+                      'OT',
                       'Day Off',
                       'Advance',
                       'Final Salary',
@@ -313,6 +338,10 @@ function Dashboard() {
                             {stats.earlyDays} วัน
                           </td>
 
+                          <td className="px-6 py-4 font-semibold text-cyan-300">
+                            {formatOTHours(stats.otMinutes)}
+                          </td>
+
                           <td className="px-6 py-4 text-white/70">
                             {stats.approvedDayOffs} วัน
                           </td>
@@ -329,7 +358,7 @@ function Dashboard() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="9" className="px-6 py-12 text-center text-white/40">
+                      <td colSpan="10" className="px-6 py-12 text-center text-white/40">
                         No employees found
                       </td>
                     </tr>
@@ -350,6 +379,7 @@ function Dashboard() {
             formatCurrency={formatCurrency}
             formatDate={formatDate}
             formatTime={formatTime}
+            formatOTHours={formatOTHours}
             calculateDuration={calculateDuration}
             getMonthName={getMonthName}
             getEmployeeStats={getEmployeeStats}
@@ -367,6 +397,7 @@ function EmployeeModal({
   formatCurrency,
   formatDate,
   formatTime,
+  formatOTHours,
   calculateDuration,
   getMonthName,
   getEmployeeStats,
@@ -531,6 +562,10 @@ function EmployeeModal({
             <span className="font-semibold text-orange-300">
               ออกก่อน {stats.earlyDays} วัน
             </span>
+            {' · '}
+            <span className="font-semibold text-cyan-300">
+              OT {formatOTHours(stats.otMinutes)}
+            </span>
           </p>
         </div>
 
@@ -558,6 +593,7 @@ function EmployeeModal({
               logs={attendanceLogs}
               formatDate={formatDate}
               formatTime={formatTime}
+              formatOTHours={formatOTHours}
               calculateDuration={calculateDuration}
             />
           ) : activeTab === 'dayoff' ? (
@@ -575,7 +611,13 @@ function EmployeeModal({
   )
 }
 
-function AttendanceLogs({ logs, formatDate, formatTime, calculateDuration }) {
+function AttendanceLogs({
+  logs,
+  formatDate,
+  formatTime,
+  formatOTHours,
+  calculateDuration,
+}) {
   if (!logs.length) return <EmptyLog text="No attendance logs" />
 
   const getStatusStyle = (status) => {
@@ -595,16 +637,18 @@ function AttendanceLogs({ logs, formatDate, formatTime, calculateDuration }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[1080px] w-full">
+      <table className="min-w-[1280px] w-full">
         <thead>
           <tr className="border-b border-white/10 text-left">
             {[
               'Date',
               'Status',
+              'Shift',
               'Check In',
               'Late',
               'Check Out',
               'Early Out',
+              'OT',
               'Duration',
               'Note',
             ].map((head) => (
@@ -636,6 +680,10 @@ function AttendanceLogs({ logs, formatDate, formatTime, calculateDuration }) {
                 >
                   {log.status}
                 </span>
+              </td>
+
+              <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-cyan-300">
+                {log.status === 'PRESENT' ? log.shiftName || '-' : '-'}
               </td>
 
               <td className="whitespace-nowrap px-4 py-3">
@@ -688,6 +736,12 @@ function AttendanceLogs({ logs, formatDate, formatTime, calculateDuration }) {
                 ) : (
                   <span className="text-white/30">-</span>
                 )}
+              </td>
+
+              <td className="whitespace-nowrap px-4 py-3 font-bold text-cyan-300">
+                {log.status === 'PRESENT'
+                  ? formatOTHours(log.otMinutes || 0)
+                  : '-'}
               </td>
 
               <td className="whitespace-nowrap px-4 py-3 font-bold text-white">
