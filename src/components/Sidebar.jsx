@@ -82,6 +82,11 @@ function Sidebar() {
       icon: <HistoryIcon className="w-5 h-5" />,
       label: 'ประวัติ',
     },
+    {
+      to: '/user/calendar',
+      icon: <CalendarDays className="w-5 h-5" />,
+      label: 'ปฏิทินส่วนตัว',
+    }
   ]
 
   const adminItems = [
@@ -119,6 +124,11 @@ function Sidebar() {
       icon: <Building2 className="w-5 h-5" />,
       label: 'Organization',
     },
+    {
+      to: '/admin/calendar',
+      icon: <CalendarDays className="w-5 h-5" />,
+      label: 'Calendar',
+    }
   ]
 
   const allMenuItems = [

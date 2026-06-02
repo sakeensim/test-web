@@ -17,7 +17,7 @@ import UserManagement from '../adminPage/UserManagement'
 import WorkTimeRecord from '../adminPage/WorkTimeRecord'
 import OrganizationSettings from '../adminPage/OrganizationSettings'
 import HolidayPage from '../adminPage/HolidayPage'
-
+import CalendarPage from '../adminPage/CalendarPage'
 import ProtectRoutes from './ProtectRoutes'
 
 function AppRoutes() {
@@ -40,6 +40,7 @@ function AppRoutes() {
         <Route path="day-off" element={<DayOff />} />
         <Route path="advancd-salary" element={<AdvanceSalary />} />
         <Route path="history" element={<UserHistoryPage />} />
+        <Route path="calendar" element={<CalendarPage />} />
       </Route>
 
       <Route
@@ -62,6 +63,7 @@ function AppRoutes() {
         <Route path="work-time-record" element={<WorkTimeRecord />} />
         <Route path="organization" element={<OrganizationSettings />} />
         <Route path="holiday" element={<HolidayPage />} />
+        <Route path="calendar" element={<CalendarPage />} />
       </Route>
     </Routes>
   )
