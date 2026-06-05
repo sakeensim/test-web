@@ -50,14 +50,16 @@ function CalendarPage() {
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'OWNER'
   const isAdminPage = location.pathname.startsWith('/admin')
-  const canManageNote = isAdminPage && isAdmin
+
+  const canAddNote = Boolean(user)
+  const canEditDeleteNote = isAdminPage && isAdmin
 
   useEffect(() => {
     if (!token) return
 
     fetchCalendar()
 
-    if (canManageNote) {
+    if (isAdmin) {
       fetchBranches()
     }
   }, [token, selectedBranch, user?.role, location.pathname])
@@ -79,7 +81,7 @@ function CalendarPage() {
       setLoading(true)
 
       const url =
-        canManageNote
+        isAdminPage && isAdmin
           ? `${API_URL}/calendar/admin?branchId=${selectedBranch}`
           : `${API_URL}/calendar/user`
 
@@ -160,9 +162,9 @@ function CalendarPage() {
       ...DEFAULT_NOTE_FORM,
       date: moment(date || new Date()).format('YYYY-MM-DD'),
       branchId:
-        selectedBranch !== 'all'
+        isAdmin && selectedBranch !== 'all'
           ? selectedBranch
-          : branches[0]?.id
+          : isAdmin && branches[0]?.id
             ? String(branches[0].id)
             : '',
     })
@@ -190,8 +192,13 @@ function CalendarPage() {
   const submitNote = async (e) => {
     e.preventDefault()
 
-    if (!noteForm.date || !noteForm.title || !noteForm.branchId) {
-      createAlert('error', 'กรุณากรอกวันที่ หัวข้อ และสาขา')
+    if (!noteForm.date || !noteForm.title) {
+      createAlert('error', 'กรุณากรอกวันที่และหัวข้อ')
+      return
+    }
+
+    if (isAdmin && !noteForm.branchId) {
+      createAlert('error', 'กรุณาเลือกสาขา')
       return
     }
 
@@ -202,7 +209,10 @@ function CalendarPage() {
         date: noteForm.date,
         title: noteForm.title,
         note: noteForm.note,
-        branchId: Number(noteForm.branchId),
+      }
+
+      if (isAdmin && noteForm.branchId) {
+        payload.branchId = Number(noteForm.branchId)
       }
 
       if (noteForm.id) {
@@ -212,7 +222,7 @@ function CalendarPage() {
 
         createAlert('success', 'แก้ไข note สำเร็จ')
       } else {
-        await axios.post(`${API_URL}/admin/calendar-note`, payload, {
+        await axios.post(`${API_URL}/calendar-note`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         })
 
@@ -221,14 +231,6 @@ function CalendarPage() {
 
       closeNoteModal()
       await fetchCalendar()
-
-      if (selectedDate) {
-        const clickedDate = moment(selectedDate).format('YYYY-MM-DD')
-        const freshEvents = events.filter(
-          (event) => moment(event.start).format('YYYY-MM-DD') === clickedDate
-        )
-        setSelectedDayEvents(freshEvents)
-      }
     } catch (error) {
       console.log(error)
       createAlert(
@@ -434,7 +436,7 @@ function CalendarPage() {
             <h1 className="mt-2 text-3xl font-bold text-white">
               {isAdminPage
                 ? 'Branch Day Off, Holiday & Note Calendar'
-                : 'My Day Off, Holiday & Note Calendar'}
+                : 'My Branch Calendar'}
             </h1>
 
             <p className="mt-2 text-white/45">
@@ -444,8 +446,8 @@ function CalendarPage() {
             </p>
           </div>
 
-          {canManageNote && (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            {isAdminPage && isAdmin && (
               <div className="rounded-2xl border border-white/10 bg-[#11152E]/90 px-4 py-3">
                 <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/40">
                   <Building2 className="h-4 w-4" />
@@ -472,7 +474,9 @@ function CalendarPage() {
                   ))}
                 </select>
               </div>
+            )}
 
+            {canAddNote && (
               <button
                 type="button"
                 onClick={() => openAddNoteModal()}
@@ -481,8 +485,8 @@ function CalendarPage() {
                 <Plus className="h-4 w-4" />
                 Add Note
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -603,7 +607,7 @@ function CalendarPage() {
               </button>
             </div>
 
-            {canManageNote && (
+            {canAddNote && (
               <button
                 type="button"
                 onClick={() => openAddNoteModal(selectedDate)}
@@ -616,9 +620,7 @@ function CalendarPage() {
 
             {selectedDayEvents.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-center">
-                <p className="text-white/50">
-                  วันนี้ไม่มีรายการในปฏิทิน
-                </p>
+                <p className="text-white/50">วันนี้ไม่มีรายการในปฏิทิน</p>
               </div>
             ) : (
               <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
@@ -660,7 +662,7 @@ function CalendarPage() {
                         </div>
                       </div>
 
-                      {canManageNote && event.type === 'note' && (
+                      {canEditDeleteNote && event.type === 'note' && (
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -733,29 +735,31 @@ function CalendarPage() {
                 />
               </div>
 
-              <div>
-                <p className="mb-2 text-xs font-semibold text-white/40">
-                  Branch
-                </p>
-                <select
-                  value={noteForm.branchId}
-                  onChange={(e) =>
-                    setNoteForm({ ...noteForm, branchId: e.target.value })
-                  }
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-[#11152E] px-4 text-white outline-none"
-                >
-                  <option value="">เลือกสาขา</option>
-                  {branches.map((branch) => (
-                    <option
-                      key={branch.id}
-                      value={branch.id}
-                      className="bg-[#11152E]"
-                    >
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {isAdmin && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold text-white/40">
+                    Branch
+                  </p>
+                  <select
+                    value={noteForm.branchId}
+                    onChange={(e) =>
+                      setNoteForm({ ...noteForm, branchId: e.target.value })
+                    }
+                    className="h-12 w-full rounded-2xl border border-white/10 bg-[#11152E] px-4 text-white outline-none"
+                  >
+                    <option value="">เลือกสาขา</option>
+                    {branches.map((branch) => (
+                      <option
+                        key={branch.id}
+                        value={branch.id}
+                        className="bg-[#11152E]"
+                      >
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <p className="mb-2 text-xs font-semibold text-white/40">
