@@ -65,6 +65,33 @@ function UserHistoryPage() {
       minimumFractionDigits: 0,
     }).format(Number(amount || 0))
 
+  const formatMinutes = (minutes) => {
+    const total = Number(minutes || 0)
+
+    if (total <= 0) return '0 นาที'
+
+    const hours = Math.floor(total / 60)
+    const mins = total % 60
+
+    if (hours <= 0) return `${mins} นาที`
+    if (mins <= 0) return `${hours} ชม.`
+
+    return `${hours} ชม. ${mins} นาที`
+  }
+
+  const calculateDuration = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return '-'
+
+    const diffMs = new Date(checkOut).getTime() - new Date(checkIn).getTime()
+
+    if (diffMs <= 0) return '-'
+
+    const hours = Math.floor(diffMs / (1000 * 60 * 60))
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+
+    return `${hours}h ${minutes}m`
+  }
+
   const statusClass = (status) => {
     if (status === 'APPROVED') return 'text-[#00B8A9] bg-[#00B8A9]/10'
     if (status === 'REJECTED') return 'text-red-300 bg-red-400/10'
@@ -72,12 +99,34 @@ function UserHistoryPage() {
     return 'text-white/60 bg-white/[0.06]'
   }
 
-  const attendanceStatusClass = (status) => {
+  const attendanceStatusClass = (status, type) => {
+    if (type === 'OT') {
+      if (status === 'COMPLETED') return 'text-cyan-300 bg-cyan-400/10'
+      if (status === 'ACTIVE') return 'text-[#FFB347] bg-[#FFB347]/10'
+      if (status === 'CANCELLED') return 'text-red-300 bg-red-400/10'
+      if (status === 'EXPIRED') return 'text-orange-300 bg-orange-400/10'
+      return 'text-white/60 bg-white/[0.06]'
+    }
+
     if (status === 'PRESENT') return 'text-[#00B8A9] bg-[#00B8A9]/10'
     if (status === 'ABSENT') return 'text-red-300 bg-red-400/10'
     if (status === 'DAY_OFF') return 'text-sky-300 bg-sky-400/10'
     if (status === 'HOLIDAY') return 'text-[#FFB347] bg-[#FFB347]/10'
     return 'text-white/60 bg-white/[0.06]'
+  }
+
+  const typeClass = (type) => {
+    if (type === 'OT') return 'text-cyan-300 bg-cyan-400/10'
+    return 'text-[#00B8A9] bg-[#00B8A9]/10'
+  }
+
+  const isCountableOT = (ot) => {
+    return (
+      ot?.checkIn &&
+      ot?.checkOut &&
+      ot.status !== 'CANCELLED' &&
+      ot.status !== 'EXPIRED'
+    )
   }
 
   if (loading) {
@@ -91,10 +140,32 @@ function UserHistoryPage() {
   if (!data) return null
 
   const attendanceLogs = data.logs.attendanceLogs || []
-  const totalOTMinutes =
-    data.summary.otMinutes ||
-    attendanceLogs.reduce((sum, log) => sum + Number(log.otMinutes || 0), 0)
+  const overtimeLogs = data.logs.overtimeLogs || data.logs.overtimeTrackings || []
 
+  const totalOTMinutes =
+    data.summary.totalOtMinutes ||
+    overtimeLogs
+      .filter(isCountableOT)
+      .reduce((sum, ot) => sum + Number(ot.otMinutes || 0), 0)
+
+  const workLogs = attendanceLogs.map((log) => ({
+    ...log,
+    type: 'WORK',
+    rowStatus: log.status,
+    sortDate: log.checkIn || log.date,
+    }))
+
+    const otLogs = overtimeLogs.map((ot) => ({
+    ...ot,
+    type: 'OT',
+    rowStatus: ot.status,
+    date: ot.date || ot.checkIn,
+    sortDate: ot.checkIn || ot.date,
+    }))
+
+    const combinedLogs = [...workLogs, ...otLogs].sort(
+    (a, b) => new Date(b.sortDate || b.date) - new Date(a.sortDate || a.date)
+    )
   return (
     <div className="min-h-dvh w-full p-4 sm:p-6">
       <div className="mx-auto max-w-6xl">
@@ -163,7 +234,7 @@ function UserHistoryPage() {
             <Mini title="ขาด" value={`${data.summary.absentDays || 0} วัน`} color="text-red-300" />
             <Mini title="สาย" value={`${data.summary.lateDays} วัน`} color="text-red-300" />
             <Mini title="ออกก่อน" value={`${data.summary.earlyDays} วัน`} color="text-orange-300" />
-            <Mini title="OT" value={`${totalOTMinutes} นาที`} color="text-cyan-300" />
+            <Mini title="OT" value={formatMinutes(totalOTMinutes)} color="text-cyan-300" />
             <Mini title="ลา" value={`${data.summary.dayOffs} วัน`} color="text-white" />
             <Mini title="เบิกล่วงหน้า" value={formatMoney(data.summary.advanceTaken)} color="text-[#FFB347]" />
             <Mini title="เงินเดือนสุทธิ" value={formatMoney(data.summary.finalSalary)} color="text-[#00B8A9]" />
@@ -173,7 +244,7 @@ function UserHistoryPage() {
         <div className="mt-5 rounded-[2rem] border border-white/10 bg-[#11152E]/90 p-4 shadow-2xl">
           <div className="flex overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] p-1">
             {[
-              ['check', 'Attendance'],
+              ['check', 'Attendance / OT'],
               ['dayoff', 'Day Off'],
               ['salary', 'Salary'],
             ].map(([key, label]) => (
@@ -193,11 +264,12 @@ function UserHistoryPage() {
 
           <div className="mt-4 max-h-[420px] overflow-auto rounded-2xl bg-white/[0.03] p-3">
             {activeTab === 'check' && (
-              <table className="min-w-[1180px] w-full">
+              <table className="min-w-[1320px] w-full">
                 <thead>
                   <tr className="border-b border-white/10 text-left">
                     {[
                       'Date',
+                      'Type',
                       'Status',
                       'Shift',
                       'Check In',
@@ -205,6 +277,7 @@ function UserHistoryPage() {
                       'Check Out',
                       'Early',
                       'OT',
+                      'Duration',
                       'Note',
                     ].map((h) => (
                       <th
@@ -218,77 +291,101 @@ function UserHistoryPage() {
                 </thead>
 
                 <tbody>
-                  {attendanceLogs.length > 0 ? (
-                    attendanceLogs.map((log, index) => (
-                      <tr
-                        key={`${log.date}-${index}`}
-                        className="border-b border-white/5"
-                      >
-                        <td className="whitespace-nowrap px-4 py-3 text-white">
-                          {formatDate(log.date || log.checkIn)}
-                        </td>
+                  {combinedLogs.length > 0 ? (
+                    combinedLogs.map((log, index) => {
+                      const isOT = log.type === 'OT'
+                      const status = isOT ? log.status : log.status
 
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${attendanceStatusClass(
-                              log.status
-                            )}`}
-                          >
-                            {log.status}
-                          </span>
-                        </td>
+                      return (
+                        <tr
+                          key={`${log.type}-${log.id || log.date}-${index}`}
+                          className={`border-b border-white/5 ${
+                            isOT ? 'bg-cyan-400/[0.025]' : ''
+                          }`}
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 text-white">
+                            {formatDate(log.date || log.checkIn)}
+                          </td>
 
-                        <td className="whitespace-nowrap px-4 py-3 text-cyan-300">
-                          {log.status === 'PRESENT'
-                            ? log.shiftName || '-'
-                            : '-'}
-                        </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold ${typeClass(
+                                log.type
+                              )}`}
+                            >
+                              {isOT ? 'OT' : 'WORK'}
+                            </span>
+                          </td>
 
-                        <td className="whitespace-nowrap px-4 py-3 text-[#00B8A9]">
-                          {log.status === 'PRESENT'
-                            ? formatTime(log.checkIn)
-                            : '-'}
-                        </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold ${attendanceStatusClass(
+                                status,
+                                log.type
+                              )}`}
+                            >
+                              {isOT ? `OT ${status}` : status}
+                            </span>
+                          </td>
 
-                        <td className="whitespace-nowrap px-4 py-3 text-red-300">
-                          {log.status === 'PRESENT'
-                            ? `${log.lateMinutes || 0}m`
-                            : '-'}
-                        </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-cyan-300">
+                            {!isOT && log.status === 'PRESENT'
+                              ? log.shiftName || '-'
+                              : '-'}
+                          </td>
 
-                        <td className="whitespace-nowrap px-4 py-3 text-[#FFB347]">
-                          {log.status === 'PRESENT'
-                            ? formatTime(log.checkOut)
-                            : '-'}
-                        </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-[#00B8A9]">
+                            {(isOT || log.status === 'PRESENT') && log.checkIn
+                              ? formatTime(log.checkIn)
+                              : '-'}
+                          </td>
 
-                        <td className="whitespace-nowrap px-4 py-3 text-orange-300">
-                          {log.status === 'PRESENT'
-                            ? `${log.earlyLeaveMinutes || 0}m`
-                            : '-'}
-                        </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-red-300">
+                            {!isOT && log.status === 'PRESENT'
+                              ? `${log.lateMinutes || 0}m`
+                              : '-'}
+                          </td>
 
-                        <td className="whitespace-nowrap px-4 py-3 text-cyan-300">
-                          {log.status === 'PRESENT'
-                            ? `${log.otMinutes || 0}m`
-                            : '-'}
-                        </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-[#FFB347]">
+                            {(isOT || log.status === 'PRESENT') && log.checkOut
+                              ? formatTime(log.checkOut)
+                              : '-'}
+                          </td>
 
-                        <td className="px-4 py-3 text-white/50">
-                          <p className="max-w-[180px] truncate">
-                            {log.checkInNote ||
-                              log.checkOutNote ||
-                              log.reason ||
-                              (log.status === 'HOLIDAY'
-                                ? 'Store holiday'
-                                : '-')}
-                          </p>
-                        </td>
-                      </tr>
-                    ))
+                          <td className="whitespace-nowrap px-4 py-3 text-orange-300">
+                            {!isOT && log.status === 'PRESENT'
+                              ? `${log.earlyLeaveMinutes || 0}m`
+                              : '-'}
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-3 text-cyan-300">
+                            {isOT ? formatMinutes(log.otMinutes || 0) : '-'}
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-3 text-white">
+                            {(isOT || log.status === 'PRESENT') && log.checkOut
+                              ? calculateDuration(log.checkIn, log.checkOut)
+                              : '-'}
+                          </td>
+
+                          <td className="px-4 py-3 text-white/50">
+                            <p className="max-w-[180px] truncate">
+                              {isOT
+                                ? log.noteIn || log.noteOut || '-'
+                                : log.checkInNote ||
+                                  log.checkOutNote ||
+                                  log.reason ||
+                                  (log.status === 'HOLIDAY'
+                                    ? 'Store holiday'
+                                    : '-')}
+                            </p>
+                          </td>
+                        </tr>
+                      )
+                    })
                   ) : (
                     <tr>
-                      <td colSpan="9" className="py-10 text-center text-white/35">
+                      <td colSpan="11" className="py-10 text-center text-white/35">
                         No attendance logs
                       </td>
                     </tr>

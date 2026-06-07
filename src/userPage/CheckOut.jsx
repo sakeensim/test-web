@@ -1,10 +1,12 @@
 import moment from 'moment/min/moment-with-locales'
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import axios from 'axios'
 
 import useAuthStore from '../store/auth-store'
 import timeStore from '../store/time-store'
 import { createAlert } from '../utils/createAlert'
+import API_URL from '../utils/api'
 
 function CheckOut() {
   const token = useAuthStore((state) => state.token)
@@ -12,8 +14,10 @@ function CheckOut() {
 
   const [now, setNow] = useState(new Date())
   const [note, setNote] = useState('')
+  const [checkoutType, setCheckoutType] = useState('')
 
   const currentShift = time?.shift || null
+  const isOvertimeMode = checkoutType === 'OT'
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -23,8 +27,31 @@ function CheckOut() {
     return () => clearInterval(timer)
   }, [])
 
+  const endOvertime = async (latitude, longitude) => {
+    const res = await axios.patch(
+      `${API_URL}/user/overtime/end`,
+      {
+        latitude,
+        longitude,
+        noteOut: note,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    return res.data
+  }
+
   const hdlSubmit = async (e) => {
     e.preventDefault()
+
+    if (!checkoutType) {
+      createAlert('error', 'กรุณาเลือกประเภทการออกงานก่อน Check-out')
+      return
+    }
 
     if (!navigator.geolocation) {
       createAlert('error', 'อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง')
@@ -35,6 +62,14 @@ function CheckOut() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords
+
+          if (isOvertimeMode) {
+            const res = await endOvertime(latitude, longitude)
+
+            console.log('End OT response:', res)
+            createAlert('success', 'จบ OT สำเร็จ')
+            return
+          }
 
           const res = await actionCheckOut(token, latitude, longitude, note)
 
@@ -56,7 +91,10 @@ function CheckOut() {
             return
           }
 
-          createAlert('error', message || 'Check-out ล้มเหลว')
+          createAlert(
+            'error',
+            message || (isOvertimeMode ? 'จบ OT ล้มเหลว' : 'Check-out ล้มเหลว')
+          )
         }
       },
       (error) => {
@@ -81,11 +119,15 @@ function CheckOut() {
             </p>
 
             <h1 className="mt-4 max-w-xl text-5xl font-bold leading-tight text-white">
-              Finish your workday properly.
+              {isOvertimeMode
+                ? 'Finish your overtime properly.'
+                : 'Finish your workday properly.'}
             </h1>
 
             <p className="mt-4 max-w-lg text-lg text-white/50">
-              ลงชื่อออกเมื่อสิ้นสุดเวลาทำงาน เพื่อบันทึกเวลาทำงานให้ครบถ้วน
+              {isOvertimeMode
+                ? 'จบ OT เพื่อบันทึกเวลาล่วงเวลาให้ครบถ้วน'
+                : 'ลงชื่อออกเมื่อสิ้นสุดเวลาทำงาน เพื่อบันทึกเวลาทำงานให้ครบถ้วน'}
             </p>
 
             <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
@@ -110,7 +152,7 @@ function CheckOut() {
               </h2>
 
               <p className="mt-2 text-sm text-white/40">
-                ตรวจสอบวันที่และเวลาก่อนกด Check-Out
+                เลือกประเภทการออกงานก่อนกด Check-Out
               </p>
             </div>
 
@@ -148,24 +190,28 @@ function CheckOut() {
                 />
               </div>
 
-              <div className="rounded-2xl border border-[#FFB347]/20 bg-[#FFB347]/10 p-4">
-                <p className="text-xs text-[#FFB347]/80">กะปัจจุบัน</p>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-xs text-white/40">ประเภทการออกงาน</p>
 
-                {currentShift ? (
-                  <div className="mt-2">
-                    <p className="text-lg font-bold text-white">
-                      {currentShift.name || 'Shift'}
-                    </p>
+                <select
+                  value={checkoutType}
+                  onChange={(e) => setCheckoutType(e.target.value)}
+                  className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#11152E] px-4 text-sm font-semibold text-white outline-none"
+                >
+                  <option value="" className="bg-[#11152E]">
+                    เลือกกะออกงาน / OT
+                  </option>
 
-                    <p className="mt-1 text-sm font-semibold text-[#FFB347]">
-                      {currentShift.checkInTime} - {currentShift.checkOutTime}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-white/45">
-                    ระบบจะใช้กะที่คุณเลือกตอน Check-in
-                  </p>
-                )}
+                  <option value="WORK" className="bg-[#11152E]">
+                    {currentShift
+                      ? `${currentShift.checkInTime} - ${currentShift.checkOutTime}`
+                      : 'Check-out งานประจำ'}
+                  </option>
+
+                  <option value="OT" className="bg-[#11152E]">
+                    OT
+                  </option>
+                </select>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
@@ -173,7 +219,11 @@ function CheckOut() {
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="เช่น ออกก่อนเวลา / มีธุระ / เหตุผลเพิ่มเติม"
+                  placeholder={
+                    isOvertimeMode
+                      ? 'เช่น จบงานจัดเลี้ยง / ปิดร้านเรียบร้อย / เคลียร์ออเดอร์เสร็จ'
+                      : 'เช่น ออกก่อนเวลา / มีธุระ / เหตุผลเพิ่มเติม'
+                  }
                   rows={3}
                   className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30"
                 />
@@ -181,18 +231,35 @@ function CheckOut() {
 
               <button
                 type="submit"
-                className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-[#FFB347] text-base font-bold text-[#1B1F3B] shadow-[0_0_30px_rgba(255,179,71,0.22)] transition hover:scale-[1.01] active:scale-[0.98]"
+                className={`mt-2 flex h-14 w-full items-center justify-center rounded-2xl text-base font-bold transition hover:scale-[1.01] active:scale-[0.98] ${
+                  isOvertimeMode
+                    ? 'bg-cyan-300 text-[#11152E] shadow-[0_0_30px_rgba(103,232,249,0.22)]'
+                    : 'bg-[#FFB347] text-[#1B1F3B] shadow-[0_0_30px_rgba(255,179,71,0.22)]'
+                }`}
               >
-                Check-Out
+                {isOvertimeMode ? 'End OT' : 'Check-Out'}
               </button>
             </form>
 
-            <div className="mt-5 rounded-2xl border border-[#FFB347]/20 bg-[#FFB347]/10 p-4">
-              <p className="text-sm font-medium text-[#FFB347]">
-                Check-Out Reminder
+            <div
+              className={`mt-5 rounded-2xl border p-4 ${
+                isOvertimeMode
+                  ? 'border-cyan-400/20 bg-cyan-400/10'
+                  : 'border-[#FFB347]/20 bg-[#FFB347]/10'
+              }`}
+            >
+              <p
+                className={`text-sm font-medium ${
+                  isOvertimeMode ? 'text-cyan-300' : 'text-[#FFB347]'
+                }`}
+              >
+                {isOvertimeMode ? 'End OT Reminder' : 'Check-Out Reminder'}
               </p>
+
               <p className="mt-1 text-xs leading-relaxed text-white/45">
-                ระบบจะบันทึกเวลาสิ้นสุดการทำงานของคุณในวันนี้
+                {isOvertimeMode
+                  ? 'ระบบจะบันทึกเวลาสิ้นสุด OT ของคุณ'
+                  : 'ระบบจะบันทึกเวลาสิ้นสุดการทำงานปกติของคุณ'}
               </p>
             </div>
           </div>

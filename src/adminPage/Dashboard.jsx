@@ -102,14 +102,8 @@ function Dashboard() {
     const mins = totalMinutes % 60
 
     if (totalMinutes <= 0) return '0 ชม.'
-
-    if (mins === 0) {
-      return `${hours} ชม.`
-    }
-
-    if (hours === 0) {
-      return `${mins} นาที`
-    }
+    if (mins === 0) return `${hours} ชม.`
+    if (hours === 0) return `${mins} นาที`
 
     return `${hours} ชม. ${mins} นาที`
   }
@@ -121,34 +115,83 @@ function Dashboard() {
     })
   }
 
+  const isCountableOT = (ot) => {
+    if (!ot?.checkIn || !ot?.checkOut) return false
+    if (ot.status === 'CANCELLED' || ot.status === 'EXPIRED') return false
+    return true
+  }
+
   const getEmployeeStats = (employee) => {
     const attendanceLogs = employee.attendanceLogs || []
     const timeLogs = employee.timetracking || []
+    const rawOvertimeLogs =
+      employee.overtimeLogs || employee.overtimeTrackings || []
     const dayOffs = employee.dayOff || employee.dayOffsTaken || []
     const advanceLogs = employee.advanceSalary || []
 
-    const workingDays = attendanceLogs.length
-      ? attendanceLogs.filter((log) => log.status === 'PRESENT').length
+    const normalLogs = attendanceLogs.length
+      ? attendanceLogs
+      : timeLogs.map((log) => ({
+          ...log,
+          date: log.date || log.checkIn,
+          status: 'PRESENT',
+          shiftName: log.shift?.name || log.shiftName || null,
+        }))
+
+    const overtimeLogs = rawOvertimeLogs.map((ot) => ({
+      ...ot,
+      type: 'OT',
+      date: ot.date || ot.checkIn,
+      status: ot.status || 'ACTIVE',
+      checkIn: ot.checkIn,
+      checkOut: ot.checkOut,
+      otMinutes: Number(ot.otMinutes || 0),
+    }))
+
+    const formattedWorkLogs = normalLogs.map((log) => ({
+      ...log,
+      type: 'WORK',
+      rowStatus: log.status,
+      sortDate: log.checkIn || log.date,
+    }))
+
+    const formattedOtLogs = overtimeLogs.map((ot) => ({
+      ...ot,
+      type: 'OT',
+      rowStatus: 'OT',
+      sortDate: ot.checkIn || ot.date,
+    }))
+
+    const combinedLogs = [...formattedWorkLogs, ...formattedOtLogs].sort(
+      (a, b) => new Date(b.sortDate || b.date) - new Date(a.sortDate || a.date)
+    )
+
+    const workingDays = normalLogs.length
+      ? normalLogs.filter((log) => log.status === 'PRESENT').length
       : timeLogs.length
 
-    const lateDays = attendanceLogs.length
-      ? attendanceLogs.filter((log) => Number(log.lateMinutes || 0) > 0).length
+    const lateDays = normalLogs.length
+      ? normalLogs.filter((log) => Number(log.lateMinutes || 0) > 0).length
       : timeLogs.filter((log) => Number(log.lateMinutes || 0) > 0).length
 
-    const earlyDays = attendanceLogs.length
-      ? attendanceLogs.filter((log) => Number(log.earlyLeaveMinutes || 0) > 0).length
-      : timeLogs.filter((log) => Number(log.earlyLeaveMinutes || 0) > 0).length
+    const earlyDays = normalLogs.length
+      ? normalLogs.filter((log) => Number(log.earlyLeaveMinutes || 0) > 0)
+          .length
+      : timeLogs.filter((log) => Number(log.earlyLeaveMinutes || 0) > 0)
+          .length
 
-    const otMinutes = attendanceLogs.length
-      ? attendanceLogs.reduce((sum, log) => sum + Number(log.otMinutes || 0), 0)
-      : timeLogs.reduce((sum, log) => sum + Number(log.otMinutes || 0), 0)
+    const otMinutes = overtimeLogs
+      .filter(isCountableOT)
+      .reduce((sum, ot) => sum + Number(ot.otMinutes || 0), 0)
 
     const approvedDayOffs = dayOffs.filter(
       (item) => item.status === 'APPROVED'
     ).length
 
     return {
-      attendanceLogs,
+      attendanceLogs: normalLogs,
+      overtimeLogs,
+      combinedLogs,
       timeLogs,
       dayOffs,
       advanceLogs,
@@ -358,7 +401,10 @@ function Dashboard() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="10" className="px-6 py-12 text-center text-white/40">
+                      <td
+                        colSpan="10"
+                        className="px-6 py-12 text-center text-white/40"
+                      >
                         No employees found
                       </td>
                     </tr>
@@ -449,7 +495,7 @@ function EmployeeModal({
 
   const stats = getEmployeeStats(detail)
 
-  const attendanceLogs = stats.attendanceLogs || []
+  const combinedLogs = stats.combinedLogs || []
   const dayOffs = stats.dayOffs || []
   const advanceLogs = stats.advanceLogs || []
 
@@ -458,7 +504,7 @@ function EmployeeModal({
   const finalSalary = Number(detail.finalSalary || baseSalary - advanceTaken)
 
   const tabs = [
-    { key: 'check', label: 'Attendance' },
+    { key: 'check', label: 'Attendance / OT' },
     { key: 'dayoff', label: 'Day Off' },
     { key: 'salary', label: 'Salary' },
   ]
@@ -590,7 +636,7 @@ function EmployeeModal({
             <p className="py-8 text-center text-white/40">Loading...</p>
           ) : activeTab === 'check' ? (
             <AttendanceLogs
-              logs={attendanceLogs}
+              logs={combinedLogs}
               formatDate={formatDate}
               formatTime={formatTime}
               formatOTHours={formatOTHours}
@@ -620,7 +666,22 @@ function AttendanceLogs({
 }) {
   if (!logs.length) return <EmptyLog text="No attendance logs" />
 
-  const getStatusStyle = (status) => {
+  const getStatusStyle = (status, type) => {
+    if (type === 'OT') {
+      switch (status) {
+        case 'COMPLETED':
+          return 'bg-cyan-400/10 text-cyan-300'
+        case 'ACTIVE':
+          return 'bg-[#FFB347]/10 text-[#FFB347]'
+        case 'EXPIRED':
+          return 'bg-orange-400/10 text-orange-300'
+        case 'CANCELLED':
+          return 'bg-red-400/10 text-red-300'
+        default:
+          return 'bg-cyan-400/10 text-cyan-300'
+      }
+    }
+
     switch (status) {
       case 'PRESENT':
         return 'bg-[#00B8A9]/10 text-[#00B8A9]'
@@ -635,6 +696,11 @@ function AttendanceLogs({
     }
   }
 
+  const getStatusLabel = (log) => {
+    if (log.type === 'OT') return `OT ${log.status || ''}`
+    return log.status
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-[1280px] w-full">
@@ -642,6 +708,7 @@ function AttendanceLogs({
           <tr className="border-b border-white/10 text-left">
             {[
               'Date',
+              'Type',
               'Status',
               'Shift',
               'Check In',
@@ -663,103 +730,123 @@ function AttendanceLogs({
         </thead>
 
         <tbody>
-          {logs.map((log, index) => (
-            <tr
-              key={`${log.date}-${index}`}
-              className="border-b border-white/5 transition hover:bg-white/[0.03]"
-            >
-              <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-white">
-                {formatDate(log.date || log.checkIn)}
-              </td>
+          {logs.map((log, index) => {
+            const isOT = log.type === 'OT'
+            const status = isOT ? log.status : log.status
 
-              <td className="whitespace-nowrap px-4 py-3">
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusStyle(
-                    log.status
-                  )}`}
-                >
-                  {log.status}
-                </span>
-              </td>
+            return (
+              <tr
+                key={`${log.type}-${log.id || log.date}-${index}`}
+                className="border-b border-white/5 transition hover:bg-white/[0.03]"
+              >
+                <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-white">
+                  {formatDate(log.date || log.checkIn)}
+                </td>
 
-              <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-cyan-300">
-                {log.status === 'PRESENT' ? log.shiftName || '-' : '-'}
-              </td>
-
-              <td className="whitespace-nowrap px-4 py-3">
-                {log.status === 'PRESENT' ? (
-                  <span className="rounded-full bg-[#00B8A9]/10 px-3 py-1 text-sm font-bold text-[#00B8A9]">
-                    {formatTime(log.checkIn)}
+                <td className="whitespace-nowrap px-4 py-3">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${
+                      isOT
+                        ? 'bg-cyan-400/10 text-cyan-300'
+                        : 'bg-white/[0.06] text-white/60'
+                    }`}
+                  >
+                    {isOT ? 'OT' : 'WORK'}
                   </span>
-                ) : (
-                  <span className="text-white/30">-</span>
-                )}
-              </td>
+                </td>
 
-              <td className="whitespace-nowrap px-4 py-3">
-                {log.status === 'PRESENT' ? (
-                  Number(log.lateMinutes || 0) > 0 ? (
-                    <span className="rounded-full bg-red-400/10 px-3 py-1 text-xs font-bold text-red-300">
-                      สาย {log.lateMinutes} นาที
+                <td className="whitespace-nowrap px-4 py-3">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusStyle(
+                      status,
+                      log.type
+                    )}`}
+                  >
+                    {getStatusLabel(log)}
+                  </span>
+                </td>
+
+                <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-cyan-300">
+                  {!isOT && log.status === 'PRESENT'
+                    ? log.shiftName || '-'
+                    : '-'}
+                </td>
+
+                <td className="whitespace-nowrap px-4 py-3">
+                  {(isOT || log.status === 'PRESENT') && log.checkIn ? (
+                    <span className="rounded-full bg-[#00B8A9]/10 px-3 py-1 text-sm font-bold text-[#00B8A9]">
+                      {formatTime(log.checkIn)}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-[#00B8A9]/10 px-3 py-1 text-xs font-bold text-[#00B8A9]">
-                      ตรงเวลา
-                    </span>
-                  )
-                ) : (
-                  <span className="text-white/30">-</span>
-                )}
-              </td>
+                    <span className="text-white/30">-</span>
+                  )}
+                </td>
 
-              <td className="whitespace-nowrap px-4 py-3">
-                {log.status === 'PRESENT' ? (
-                  <span className="rounded-full bg-[#FFB347]/10 px-3 py-1 text-sm font-bold text-[#FFB347]">
-                    {formatTime(log.checkOut)}
-                  </span>
-                ) : (
-                  <span className="text-white/30">-</span>
-                )}
-              </td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  {!isOT && log.status === 'PRESENT' ? (
+                    Number(log.lateMinutes || 0) > 0 ? (
+                      <span className="rounded-full bg-red-400/10 px-3 py-1 text-xs font-bold text-red-300">
+                        สาย {log.lateMinutes} นาที
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-[#00B8A9]/10 px-3 py-1 text-xs font-bold text-[#00B8A9]">
+                        ตรงเวลา
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-white/30">-</span>
+                  )}
+                </td>
 
-              <td className="whitespace-nowrap px-4 py-3">
-                {log.status === 'PRESENT' ? (
-                  Number(log.earlyLeaveMinutes || 0) > 0 ? (
-                    <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300">
-                      ออกก่อน {log.earlyLeaveMinutes} นาที
+                <td className="whitespace-nowrap px-4 py-3">
+                  {(isOT || log.status === 'PRESENT') && log.checkOut ? (
+                    <span className="rounded-full bg-[#FFB347]/10 px-3 py-1 text-sm font-bold text-[#FFB347]">
+                      {formatTime(log.checkOut)}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-[#00B8A9]/10 px-3 py-1 text-xs font-bold text-[#00B8A9]">
-                      ตรงเวลา
-                    </span>
-                  )
-                ) : (
-                  <span className="text-white/30">-</span>
-                )}
-              </td>
+                    <span className="text-white/30">-</span>
+                  )}
+                </td>
 
-              <td className="whitespace-nowrap px-4 py-3 font-bold text-cyan-300">
-                {log.status === 'PRESENT'
-                  ? formatOTHours(log.otMinutes || 0)
-                  : '-'}
-              </td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  {!isOT && log.status === 'PRESENT' ? (
+                    Number(log.earlyLeaveMinutes || 0) > 0 ? (
+                      <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300">
+                        ออกก่อน {log.earlyLeaveMinutes} นาที
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-[#00B8A9]/10 px-3 py-1 text-xs font-bold text-[#00B8A9]">
+                        ตรงเวลา
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-white/30">-</span>
+                  )}
+                </td>
 
-              <td className="whitespace-nowrap px-4 py-3 font-bold text-white">
-                {log.status === 'PRESENT'
-                  ? calculateDuration(log.checkIn, log.checkOut)
-                  : '-'}
-              </td>
+                <td className="whitespace-nowrap px-4 py-3 font-bold text-cyan-300">
+                  {isOT ? formatOTHours(log.otMinutes || 0) : '-'}
+                </td>
 
-              <td className="px-4 py-3">
-                <p className="max-w-[180px] truncate text-sm text-white/55">
-                  {log.checkInNote ||
-                    log.checkOutNote ||
-                    log.reason ||
-                    (log.status === 'HOLIDAY' ? 'Store holiday' : '-')}
-                </p>
-              </td>
-            </tr>
-          ))}
+                <td className="whitespace-nowrap px-4 py-3 font-bold text-white">
+                  {(isOT || log.status === 'PRESENT') && log.checkOut
+                    ? calculateDuration(log.checkIn, log.checkOut)
+                    : '-'}
+                </td>
+
+                <td className="px-4 py-3">
+                  <p className="max-w-[180px] truncate text-sm text-white/55">
+                    {isOT
+                      ? log.noteIn || log.noteOut || '-'
+                      : log.checkInNote ||
+                        log.checkOutNote ||
+                        log.reason ||
+                        (log.status === 'HOLIDAY' ? 'Store holiday' : '-')}
+                  </p>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -858,11 +945,7 @@ function SalaryLogs({ logs, formatDate, formatCurrency }) {
 }
 
 function EmptyLog({ text }) {
-  return (
-    <p className="py-8 text-center text-sm text-white/35">
-      {text}
-    </p>
-  )
+  return <p className="py-8 text-center text-sm text-white/35">{text}</p>
 }
 
 export default Dashboard

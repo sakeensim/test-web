@@ -18,6 +18,8 @@ function CheckIn() {
   const [selectedShiftId, setSelectedShiftId] = useState('')
   const [loadingShifts, setLoadingShifts] = useState(false)
 
+  const isOvertimeMode = selectedShiftId === 'OT'
+
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(new Date())
@@ -54,11 +56,29 @@ function CheckIn() {
     }
   }
 
+  const startOvertime = async (latitude, longitude) => {
+    const res = await axios.post(
+      `${API_URL}/user/overtime/start`,
+      {
+        latitude,
+        longitude,
+        noteIn: note,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    return res.data
+  }
+
   const hdlSubmit = async (e) => {
     e.preventDefault()
 
     if (!selectedShiftId) {
-      createAlert('error', 'กรุณาเลือกกะทำงานก่อน Check-in')
+      createAlert('error', 'กรุณาเลือกกะทำงานหรือเลือกเริ่ม OT')
       return
     }
 
@@ -72,6 +92,13 @@ function CheckIn() {
         try {
           const { latitude, longitude } = position.coords
 
+          if (isOvertimeMode) {
+            const res = await startOvertime(latitude, longitude)
+            console.log('Start OT response:', res)
+            createAlert('success', 'เริ่ม OT สำเร็จ')
+            return
+          }
+
           const res = await actionCheckIn(
             token,
             latitude,
@@ -83,13 +110,13 @@ function CheckIn() {
           console.log('Check-in response:', res)
           createAlert('success', 'ลงชื่อเข้า สำเร็จ')
         } catch (error) {
-          console.error('Check-in failed:', error)
+          console.error('Check-in / OT failed:', error)
 
           const status = error.response?.status
           const message = error.response?.data?.message
 
           if (status === 403) {
-            createAlert('info', message || 'คุณอยู่นอกพื้นที่ Check-in')
+            createAlert('info', message || 'คุณอยู่นอกพื้นที่')
             return
           }
 
@@ -98,7 +125,10 @@ function CheckIn() {
             return
           }
 
-          createAlert('error', message || 'Check-in ล้มเหลว')
+          createAlert(
+            'error',
+            message || (isOvertimeMode ? 'เริ่ม OT ล้มเหลว' : 'Check-in ล้มเหลว')
+          )
         }
       },
       (error) => {
@@ -152,7 +182,7 @@ function CheckIn() {
               </h2>
 
               <p className="mt-2 text-sm text-white/40">
-                กรุณาเลือกกะและอนุญาตการเข้าถึงตำแหน่งก่อนเช็กอิน
+                เลือกกะทำงานสำหรับเวลาปกติ หรือเลือก OT เพื่อเริ่มทำงานล่วงเวลา
               </p>
             </div>
 
@@ -191,7 +221,7 @@ function CheckIn() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-xs text-white/40">กะทำงาน</p>
+                <p className="text-xs text-white/40">ประเภทการเข้างาน</p>
 
                 <select
                   value={selectedShiftId}
@@ -200,7 +230,7 @@ function CheckIn() {
                   className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#11152E] px-4 text-sm font-semibold text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="" className="bg-[#11152E]">
-                    {loadingShifts ? 'กำลังโหลดกะทำงาน...' : 'เลือกกะทำงาน'}
+                    {loadingShifts ? 'กำลังโหลดข้อมูล...' : 'เลือกกะทำงาน / OT'}
                   </option>
 
                   {shifts.map((shift) => (
@@ -213,11 +243,15 @@ function CheckIn() {
                       {shift.isDefault ? ' (Default)' : ''}
                     </option>
                   ))}
+
+                  <option value="OT" className="bg-[#11152E]">
+                    OT
+                  </option>
                 </select>
 
                 {shifts.length === 0 && !loadingShifts && (
                   <p className="mt-2 text-xs text-red-300">
-                    ยังไม่มีกะทำงานสำหรับตำแหน่งนี้ กรุณาติดต่อแอดมิน
+                    ยังไม่มีกะทำงานสำหรับตำแหน่งนี้ แต่สามารถเลือก OT ได้ถ้าตำแหน่งนี้มีสิทธิ์ทำ OT
                   </p>
                 )}
               </div>
@@ -227,7 +261,11 @@ function CheckIn() {
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="เช่น รถติด / ไปทำงานนอกสถานที่ / เหตุผลเพิ่มเติม"
+                  placeholder={
+                    isOvertimeMode
+                      ? 'เช่น ช่วยปิดร้าน / งานจัดเลี้ยง / เคลียร์ออเดอร์'
+                      : 'เช่น รถติด / ไปทำงานนอกสถานที่ / เหตุผลเพิ่มเติม'
+                  }
                   rows={3}
                   className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30"
                 />
@@ -235,9 +273,13 @@ function CheckIn() {
 
               <button
                 type="submit"
-                className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-[#00B8A9] text-base font-bold text-[#1B1F3B] shadow-[0_0_30px_rgba(0,184,169,0.22)] transition hover:scale-[1.01] active:scale-[0.98]"
+                className={`mt-2 flex h-14 w-full items-center justify-center rounded-2xl text-base font-bold shadow-[0_0_30px_rgba(0,184,169,0.22)] transition hover:scale-[1.01] active:scale-[0.98] ${
+                  isOvertimeMode
+                    ? 'bg-cyan-300 text-[#11152E]'
+                    : 'bg-[#00B8A9] text-[#1B1F3B]'
+                }`}
               >
-                Check-In
+                {isOvertimeMode ? 'Start OT' : 'Check-In'}
               </button>
             </form>
 

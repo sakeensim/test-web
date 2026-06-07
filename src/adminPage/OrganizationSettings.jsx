@@ -43,6 +43,8 @@ const DEFAULT_POSITION_FORM = {
   name: '',
   description: '',
   maxDayOffPerMonth: 6,
+  allowOT: false,
+  otCapMinutes: '',
 }
 
 const createEmptyShift = (overrides = {}) => ({
@@ -52,9 +54,6 @@ const createEmptyShift = (overrides = {}) => ({
   checkOutTime: '17:00',
   isDefault: false,
   isActive: true,
-  allowOT: false,
-  otStartAfter: 0,
-  otCapMinutes: '',
   ...overrides,
 })
 
@@ -324,6 +323,15 @@ function OrganizationSettings() {
       return false
     }
 
+    if (positionForm.allowOT) {
+      const cap = Number(positionForm.otCapMinutes || 0)
+
+      if (cap <= 0) {
+        createAlert('error', 'กรุณากำหนด OT Cap มากกว่า 0 นาที')
+        return false
+      }
+    }
+
     if (positionShifts.length === 0) {
       createAlert('error', 'กรุณาเพิ่มกะอย่างน้อย 1 กะ')
       return false
@@ -369,12 +377,6 @@ function OrganizationSettings() {
     positionId: Number(positionId),
     isDefault: Boolean(shift.isDefault),
     isActive: Boolean(shift.isActive),
-    allowOT: Boolean(shift.allowOT),
-    otStartAfter: Number(shift.otStartAfter || 0),
-    otCapMinutes:
-      shift.otCapMinutes === '' || shift.otCapMinutes === null
-        ? null
-        : Number(shift.otCapMinutes),
   })
 
   const syncShifts = async (positionId, defaultShiftId = null) => {
@@ -429,6 +431,10 @@ function OrganizationSettings() {
         checkInTime: defaultShift.checkInTime,
         checkOutTime: defaultShift.checkOutTime,
         maxDayOffPerMonth: Number(positionForm.maxDayOffPerMonth),
+        allowOT: Boolean(positionForm.allowOT),
+        otCapMinutes: positionForm.allowOT
+          ? Number(positionForm.otCapMinutes || 0)
+          : null,
       }
 
       if (editingPositionId) {
@@ -474,6 +480,11 @@ function OrganizationSettings() {
       name: position.name || '',
       description: position.description || '',
       maxDayOffPerMonth: position.maxDayOffPerMonth ?? 6,
+      allowOT: Boolean(position.allowOT),
+      otCapMinutes:
+        position.otCapMinutes === null || position.otCapMinutes === undefined
+          ? ''
+          : String(position.otCapMinutes),
     })
 
     const mappedShifts =
@@ -486,12 +497,6 @@ function OrganizationSettings() {
               checkOutTime: shift.checkOutTime || '17:00',
               isDefault: Boolean(shift.isDefault),
               isActive: Boolean(shift.isActive),
-              allowOT: Boolean(shift.allowOT),
-              otStartAfter: Number(shift.otStartAfter || 0),
-              otCapMinutes:
-                shift.otCapMinutes === null || shift.otCapMinutes === undefined
-                  ? ''
-                  : String(shift.otCapMinutes),
             })
           )
         : [
@@ -601,706 +606,705 @@ function OrganizationSettings() {
 
     setPositionShifts((prev) => prev.filter((_, i) => i !== index))
   }
-    return (
-  <div className="min-h-dvh w-full px-4 py-5 sm:px-6">
-    <div className="mx-auto max-w-6xl">
-      <div className="mb-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#FFB347]">
-          Admin Panel
-        </p>
 
-        <h1 className="mt-1 text-2xl font-bold text-white">
-          Organization Settings
-        </h1>
+  return (
+    <div className="min-h-dvh w-full px-4 py-5 sm:px-6">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#FFB347]">
+            Admin Panel
+          </p>
 
-        <p className="mt-1 text-sm text-white/35">
-          จัดการสาขา ตำแหน่ง และกะทำงาน
-        </p>
-      </div>
+          <h1 className="mt-1 text-2xl font-bold text-white">
+            Organization Settings
+          </h1>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-3xl border border-white/10 bg-[#11152E]/90 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white">Branches</h2>
-              <span className="rounded-full bg-[#FFB347]/10 px-2 py-0.5 text-[11px] font-bold text-[#FFB347]">
-                {branches.length}
-              </span>
-            </div>
-
-            <button
-              onClick={openAddBranchModal}
-              className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
-            >
-              + Add
-            </button>
-          </div>
-
-          <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
-            {branches.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/30">
-                ยังไม่มีสาขา
-              </div>
-            ) : (
-              branches.map((branch) => (
-                <div
-                  key={branch.id}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-sm font-bold text-white">
-                        {branch.name}
-                      </h3>
-
-                      <p className="mt-0.5 text-xs text-white/35">
-                        {branch.code}
-                      </p>
-                    </div>
-
-                    <span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[10px] font-bold text-cyan-300">
-                      {branch.radius}m
-                    </span>
-                  </div>
-
-                  <p className="mt-2 line-clamp-1 text-xs text-white/40">
-                    {branch.address || 'No address'}
-                  </p>
-
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={() => hdlEdit(branch)}
-                      className="flex-1 rounded-xl bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white/65"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => setDeleteBranchId(branch.id)}
-                      className="flex-1 rounded-xl bg-red-400/10 px-3 py-2 text-xs font-semibold text-red-300"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          <p className="mt-1 text-sm text-white/35">
+            จัดการสาขา ตำแหน่ง และกะทำงาน
+          </p>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-[#11152E]/90 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white">Positions</h2>
-              <span className="rounded-full bg-[#00B8A9]/10 px-2 py-0.5 text-[11px] font-bold text-[#00B8A9]">
-                {positions.length}
-              </span>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-3xl border border-white/10 bg-[#11152E]/90 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white">Branches</h2>
+                <span className="rounded-full bg-[#FFB347]/10 px-2 py-0.5 text-[11px] font-bold text-[#FFB347]">
+                  {branches.length}
+                </span>
+              </div>
+
+              <button
+                onClick={openAddBranchModal}
+                className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
+              >
+                + Add
+              </button>
             </div>
 
-            <button
-              onClick={openAddPositionModal}
-              className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
-            >
-              + Add
-            </button>
-          </div>
-
-          <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
-            {positions.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/30">
-                ยังไม่มีตำแหน่ง
-              </div>
-            ) : (
-              positions.map((position) => {
-                const activeShifts =
-                  position.shifts?.filter((shift) => shift.isActive) || []
-
-                const defaultShift =
-                  position.shifts?.find((shift) => shift.isDefault) ||
-                  activeShifts[0] ||
-                  null
-
-                return (
+            <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+              {branches.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/30">
+                  ยังไม่มีสาขา
+                </div>
+              ) : (
+                branches.map((branch) => (
                   <div
-                    key={position.id}
+                    key={branch.id}
                     className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="truncate text-sm font-bold text-white">
-                          {position.name}
+                          {branch.name}
                         </h3>
 
-                        <p className="mt-0.5 line-clamp-1 text-xs text-white/35">
-                          {position.description || 'No description'}
+                        <p className="mt-0.5 text-xs text-white/35">
+                          {branch.code}
                         </p>
                       </div>
 
-                      <span className="rounded-full bg-blue-400/10 px-2 py-1 text-[10px] font-bold text-blue-300">
-                        {position.maxDayOffPerMonth} OFF
+                      <span className="rounded-full bg-cyan-400/10 px-2 py-1 text-[10px] font-bold text-cyan-300">
+                        {branch.radius}m
                       </span>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <span className="rounded-xl bg-[#FFB347]/10 px-2.5 py-1 text-[11px] font-bold text-[#FFB347]">
-                        {defaultShift?.checkInTime || '--:--'} -{' '}
-                        {defaultShift?.checkOutTime || '--:--'}
-                      </span>
-
-                      <span className="rounded-xl bg-white/[0.05] px-2.5 py-1 text-[11px] font-semibold text-white/50">
-                        {(position.shifts || []).length} shifts
-                      </span>
-
-                      {defaultShift?.allowOT && (
-                        <span className="rounded-xl bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold text-cyan-300">
-                          OT
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {(position.shifts || []).slice(0, 3).map((shift) => (
-                        <span
-                          key={shift.id}
-                          className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                            shift.isDefault
-                              ? 'bg-[#FFB347]/15 text-[#FFB347]'
-                              : shift.isActive
-                                ? 'bg-white/[0.05] text-white/55'
-                                : 'bg-white/[0.03] text-white/25'
-                          }`}
-                        >
-                          {shift.checkInTime}-{shift.checkOutTime}
-                        </span>
-                      ))}
-
-                      {(position.shifts?.length || 0) > 3 && (
-                        <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-semibold text-white/40">
-                          +{position.shifts.length - 3}
-                        </span>
-                      )}
-                    </div>
+                    <p className="mt-2 line-clamp-1 text-xs text-white/40">
+                      {branch.address || 'No address'}
+                    </p>
 
                     <div className="mt-3 flex gap-2">
                       <button
-                        onClick={() => editPosition(position)}
+                        onClick={() => hdlEdit(branch)}
                         className="flex-1 rounded-xl bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white/65"
                       >
                         Edit
                       </button>
 
                       <button
-                        onClick={() => setDeletePositionId(position.id)}
+                        onClick={() => setDeleteBranchId(branch.id)}
                         className="flex-1 rounded-xl bg-red-400/10 px-3 py-2 text-xs font-semibold text-red-300"
                       >
                         Delete
                       </button>
                     </div>
                   </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
-      {deleteBranchId && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#11152E] p-5">
-            <h2 className="text-lg font-bold text-white">Delete Branch</h2>
-
-            <p className="mt-2 text-sm text-white/45">
-              ลบสาขานี้ใช่หรือไม่
-            </p>
-
-            <div className="mt-5 flex gap-2">
-              <button
-                onClick={() => setDeleteBranchId(null)}
-                className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={async () => {
-                  await hdlDelete(deleteBranchId)
-                  setDeleteBranchId(null)
-                }}
-                className="flex-1 rounded-xl bg-red-400/15 px-4 py-3 text-sm font-bold text-red-300"
-              >
-                Delete
-              </button>
+                ))
+              )}
             </div>
           </div>
-        </div>
-      )}
 
-      {deletePositionId && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#11152E] p-5">
-            <h2 className="text-lg font-bold text-white">Delete Position</h2>
-
-            <p className="mt-2 text-sm text-white/45">
-              ลบตำแหน่งนี้ใช่หรือไม่
-            </p>
-
-            <div className="mt-5 flex gap-2">
-              <button
-                onClick={() => setDeletePositionId(null)}
-                className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={() => deletePosition(deletePositionId)}
-                className="flex-1 rounded-xl bg-red-400/15 px-4 py-3 text-sm font-bold text-red-300"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isPositionModalOpen && (
-        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
-          <div className="flex min-h-dvh items-start justify-center py-6">
-            <form
-              onSubmit={submitPosition}
-              className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#11152E] p-5"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.25em] text-[#FFB347]">
-                    Position Setup
-                  </p>
-
-                  <h2 className="mt-1 text-2xl font-bold text-white">
-                    {editingPositionId ? 'Edit Position' : 'Add Position'}
-                  </h2>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPositionModalOpen(false)
-                    resetPositionForm()
-                  }}
-                  className="rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-white/60"
-                >
-                  Close
-                </button>
+          <div className="rounded-3xl border border-white/10 bg-[#11152E]/90 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white">Positions</h2>
+                <span className="rounded-full bg-[#00B8A9]/10 px-2 py-0.5 text-[11px] font-bold text-[#00B8A9]">
+                  {positions.length}
+                </span>
               </div>
 
-              <div className="mt-5 grid gap-4 lg:grid-cols-[320px_1fr]">
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-white/35">
-                      Position Info
+              <button
+                onClick={openAddPositionModal}
+                className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
+              >
+                + Add
+              </button>
+            </div>
+
+            <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+              {positions.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 py-10 text-center text-sm text-white/30">
+                  ยังไม่มีตำแหน่ง
+                </div>
+              ) : (
+                positions.map((position) => {
+                  const activeShifts =
+                    position.shifts?.filter((shift) => shift.isActive) || []
+
+                  const defaultShift =
+                    position.shifts?.find((shift) => shift.isDefault) ||
+                    activeShifts[0] ||
+                    null
+
+                  return (
+                    <div
+                      key={position.id}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-bold text-white">
+                            {position.name}
+                          </h3>
+
+                          <p className="mt-0.5 line-clamp-1 text-xs text-white/35">
+                            {position.description || 'No description'}
+                          </p>
+                        </div>
+
+                        <span className="rounded-full bg-blue-400/10 px-2 py-1 text-[10px] font-bold text-blue-300">
+                          {position.maxDayOffPerMonth} OFF
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className="rounded-xl bg-[#FFB347]/10 px-2.5 py-1 text-[11px] font-bold text-[#FFB347]">
+                          {defaultShift?.checkInTime || '--:--'} -{' '}
+                          {defaultShift?.checkOutTime || '--:--'}
+                        </span>
+
+                        <span className="rounded-xl bg-white/[0.05] px-2.5 py-1 text-[11px] font-semibold text-white/50">
+                          {(position.shifts || []).length} shifts
+                        </span>
+
+                        {position.allowOT && (
+                          <span className="rounded-xl bg-cyan-400/10 px-2.5 py-1 text-[11px] font-bold text-cyan-300">
+                            OT {position.otCapMinutes || 0}m
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(position.shifts || []).slice(0, 3).map((shift) => (
+                          <span
+                            key={shift.id}
+                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                              shift.isDefault
+                                ? 'bg-[#FFB347]/15 text-[#FFB347]'
+                                : shift.isActive
+                                  ? 'bg-white/[0.05] text-white/55'
+                                  : 'bg-white/[0.03] text-white/25'
+                            }`}
+                          >
+                            {shift.checkInTime}-{shift.checkOutTime}
+                          </span>
+                        ))}
+
+                        {(position.shifts?.length || 0) > 3 && (
+                          <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] font-semibold text-white/40">
+                            +{position.shifts.length - 3}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => editPosition(position)}
+                          className="flex-1 rounded-xl bg-white/[0.05] px-3 py-2 text-xs font-semibold text-white/65"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={() => setDeletePositionId(position.id)}
+                          className="flex-1 rounded-xl bg-red-400/10 px-3 py-2 text-xs font-semibold text-red-300"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {deleteBranchId && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#11152E] p-5">
+              <h2 className="text-lg font-bold text-white">Delete Branch</h2>
+
+              <p className="mt-2 text-sm text-white/45">
+                ลบสาขานี้ใช่หรือไม่
+              </p>
+
+              <div className="mt-5 flex gap-2">
+                <button
+                  onClick={() => setDeleteBranchId(null)}
+                  className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={async () => {
+                    await hdlDelete(deleteBranchId)
+                    setDeleteBranchId(null)
+                  }}
+                  className="flex-1 rounded-xl bg-red-400/15 px-4 py-3 text-sm font-bold text-red-300"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {deletePositionId && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#11152E] p-5">
+              <h2 className="text-lg font-bold text-white">Delete Position</h2>
+
+              <p className="mt-2 text-sm text-white/45">
+                ลบตำแหน่งนี้ใช่หรือไม่
+              </p>
+
+              <div className="mt-5 flex gap-2">
+                <button
+                  onClick={() => setDeletePositionId(null)}
+                  className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={() => deletePosition(deletePositionId)}
+                  className="flex-1 rounded-xl bg-red-400/15 px-4 py-3 text-sm font-bold text-red-300"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isPositionModalOpen && (
+          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+            <div className="flex min-h-dvh items-start justify-center py-6">
+              <form
+                onSubmit={submitPosition}
+                className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#11152E] p-5"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.25em] text-[#FFB347]">
+                      Position Setup
                     </p>
 
+                    <h2 className="mt-1 text-2xl font-bold text-white">
+                      {editingPositionId ? 'Edit Position' : 'Add Position'}
+                    </h2>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPositionModalOpen(false)
+                      resetPositionForm()
+                    }}
+                    className="rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-white/60"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[320px_1fr]">
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-white/35">
+                        Position Info
+                      </p>
+
+                      <input
+                        value={positionForm.name}
+                        onChange={(e) =>
+                          setPositionForm({
+                            ...positionForm,
+                            name: e.target.value,
+                          })
+                        }
+                        placeholder="Position name"
+                        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                      />
+
+                      <input
+                        value={positionForm.description}
+                        onChange={(e) =>
+                          setPositionForm({
+                            ...positionForm,
+                            description: e.target.value,
+                          })
+                        }
+                        placeholder="Description"
+                        className="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                      />
+
+                      <div className="mt-3">
+                        <p className="mb-1.5 text-xs text-white/40">
+                          Max Day Off / Month
+                        </p>
+
+                        <input
+                          type="number"
+                          min="0"
+                          value={positionForm.maxDayOffPerMonth}
+                          onChange={(e) =>
+                            setPositionForm({
+                              ...positionForm,
+                              maxDayOffPerMonth: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-cyan-300">
+                            Overtime Setting
+                          </p>
+
+                          <p className="mt-1 text-xs text-white/45">
+                            กำหนดว่าตำแหน่งนี้สามารถทำ OT ได้หรือไม่
+                          </p>
+                        </div>
+
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={positionForm.allowOT}
+                            onChange={(e) =>
+                              setPositionForm({
+                                ...positionForm,
+                                allowOT: e.target.checked,
+                                otCapMinutes: e.target.checked
+                                  ? positionForm.otCapMinutes
+                                  : '',
+                              })
+                            }
+                            className="h-5 w-5 accent-cyan-300"
+                          />
+                        </label>
+                      </div>
+
+                      {positionForm.allowOT && (
+                        <div className="mt-3">
+                          <p className="mb-1.5 text-xs text-white/40">
+                            OT Cap Minutes
+                          </p>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={positionForm.otCapMinutes}
+                            onChange={(e) =>
+                              setPositionForm({
+                                ...positionForm,
+                                otCapMinutes: e.target.value,
+                              })
+                            }
+                            placeholder="เช่น 120, 240, 300"
+                            className="w-full rounded-xl border border-cyan-400/20 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/25"
+                          />
+
+                          <p className="mt-2 text-xs leading-relaxed text-white/40">
+                            ระบบจะนับ OT ไม่เกินจำนวนนี้ เช่น 240 = สูงสุด 4 ชั่วโมง
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl border border-[#00B8A9]/15 bg-[#00B8A9]/10 p-4">
+                      <p className="text-sm font-bold text-[#00B8A9]">
+                        Shift Rules
+                      </p>
+
+                      <p className="mt-1.5 text-xs leading-relaxed text-white/45">
+                        กะที่ active จะถูกใช้ตอนพนักงาน Check-in และคำนวณสาย/ออกก่อน
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/35">
+                          Shifts
+                        </p>
+
+                        <h3 className="mt-0.5 text-lg font-bold text-white">
+                          {positionShifts.length} Shift
+                        </h3>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={addShift}
+                        className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
+                      >
+                        + Add
+                      </button>
+                    </div>
+
+                    <div className="max-h-[500px] space-y-3 overflow-y-auto pr-1">
+                      {positionShifts.map((shift, index) => (
+                        <div
+                          key={shift.id || index}
+                          className={`rounded-2xl border p-3 ${
+                            shift.isDefault
+                              ? 'border-[#FFB347]/35 bg-[#FFB347]/5'
+                              : shift.isActive
+                                ? 'border-white/10 bg-[#11152E]/50'
+                                : 'border-white/5 bg-white/[0.02] opacity-60'
+                          }`}
+                        >
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-white">
+                                Shift #{index + 1}
+                              </p>
+
+                              <p className="text-xs text-white/35">
+                                {shift.isDefault
+                                  ? 'Default'
+                                  : shift.isActive
+                                    ? 'Active'
+                                    : 'Inactive'}
+                              </p>
+                            </div>
+
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setDefaultShift(index)}
+                                className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
+                                  shift.isDefault
+                                    ? 'bg-[#FFB347] text-[#1B1F3B]'
+                                    : 'bg-white/[0.06] text-white/55'
+                                }`}
+                              >
+                                Default
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => toggleShiftActive(index)}
+                                className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
+                                  shift.isActive
+                                    ? 'bg-[#00B8A9]/10 text-[#00B8A9]'
+                                    : 'bg-white/[0.06] text-white/40'
+                                }`}
+                              >
+                                {shift.isActive ? 'Active' : 'Inactive'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => removeShift(index)}
+                                className="rounded-lg bg-red-400/10 px-2.5 py-1.5 text-[11px] font-bold text-red-300"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <input
+                              value={shift.name}
+                              onChange={(e) =>
+                                updateShift(index, 'name', e.target.value)
+                              }
+                              placeholder={
+                                index === 0
+                                  ? `${positionForm.name || 'position'}_shift`
+                                  : `${positionForm.name || 'position'}_shift_${
+                                      index + 1
+                                    }`
+                              }
+                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 sm:col-span-2"
+                            />
+
+                            <input
+                              type="time"
+                              value={shift.checkInTime}
+                              onChange={(e) =>
+                                updateShift(index, 'checkInTime', e.target.value)
+                              }
+                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none"
+                            />
+
+                            <input
+                              type="time"
+                              value={shift.checkOutTime}
+                              onChange={(e) =>
+                                updateShift(index, 'checkOutTime', e.target.value)
+                              }
+                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPositionModalOpen(false)
+                      resetPositionForm()
+                    }}
+                    className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={positionLoading}
+                    className="flex-1 rounded-xl bg-[#FFB347] px-4 py-3 text-sm font-bold text-[#1B1F3B] disabled:opacity-60"
+                  >
+                    {positionLoading
+                      ? 'Saving...'
+                      : editingPositionId
+                        ? 'Update'
+                        : 'Add Position'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {isBranchModalOpen && (
+          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+            <div className="flex min-h-dvh items-start justify-center py-6">
+              <form
+                onSubmit={hdlSubmit}
+                className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#11152E] p-5"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.25em] text-[#FFB347]">
+                      Branch Setup
+                    </p>
+
+                    <h2 className="mt-1 text-2xl font-bold text-white">
+                      {editingId ? 'Edit Branch' : 'Add Branch'}
+                    </h2>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBranchModalOpen(false)
+                      setEditingId(null)
+                      setForm(DEFAULT_FORM)
+                    }}
+                    className="rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-white/60"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[300px_1fr]">
+                  <div className="space-y-3">
                     <input
-                      value={positionForm.name}
-                      onChange={(e) =>
-                        setPositionForm({
-                          ...positionForm,
-                          name: e.target.value,
-                        })
-                      }
-                      placeholder="Position name"
+                      name="name"
+                      value={form.name}
+                      onChange={hdlChange}
+                      placeholder="Branch name"
                       className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
                     />
 
                     <input
-                      value={positionForm.description}
-                      onChange={(e) =>
-                        setPositionForm({
-                          ...positionForm,
-                          description: e.target.value,
-                        })
-                      }
-                      placeholder="Description"
-                      className="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                      name="code"
+                      value={form.code}
+                      onChange={hdlChange}
+                      placeholder="Branch code"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
                     />
 
-                    <div className="mt-3">
-                      <p className="mb-1.5 text-xs text-white/40">
-                        Max Day Off / Month
+                    <textarea
+                      name="address"
+                      value={form.address}
+                      onChange={hdlChange}
+                      placeholder="Address"
+                      rows={3}
+                      className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                    />
+
+                    <input
+                      name="radius"
+                      type="number"
+                      min="10"
+                      value={form.radius}
+                      onChange={hdlChange}
+                      placeholder="Radius"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
+                    />
+
+                    <div className="rounded-2xl border border-[#00B8A9]/15 bg-[#00B8A9]/10 p-3">
+                      <p className="text-xs font-bold text-[#00B8A9]">
+                        GPS Location
                       </p>
 
-                      <input
-                        type="number"
-                        min="0"
-                        value={positionForm.maxDayOffPerMonth}
-                        onChange={(e) =>
-                          setPositionForm({
-                            ...positionForm,
-                            maxDayOffPerMonth: e.target.value,
-                          })
-                        }
-                        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none"
-                      />
+                      <p className="mt-1 text-xs text-white/45">
+                        Lat {Number(form.lat || 0).toFixed(5)} · Lng{' '}
+                        {Number(form.lng || 0).toFixed(5)}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[#00B8A9]/15 bg-[#00B8A9]/10 p-4">
-                    <p className="text-sm font-bold text-[#00B8A9]">
-                      Shift Rules
-                    </p>
-
-                    <p className="mt-1.5 text-xs leading-relaxed text-white/45">
-                      กะที่ active จะถูกใช้ตอนพนักงาน Check-in และคำนวณสาย/OT
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/35">
-                        Shifts
-                      </p>
-
-                      <h3 className="mt-0.5 text-lg font-bold text-white">
-                        {positionShifts.length} Shift
-                      </h3>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={addShift}
-                      className="rounded-xl bg-[#FFB347] px-3 py-2 text-xs font-bold text-[#1B1F3B]"
+                  <div className="overflow-hidden rounded-2xl border border-white/10">
+                    <MapContainer
+                      center={[position.lat, position.lng]}
+                      zoom={15}
+                      scrollWheelZoom
+                      className="h-[460px] w-full"
                     >
-                      + Add
-                    </button>
-                  </div>
+                      <TileLayer
+                        attribution="&copy; OpenStreetMap contributors"
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
 
-                  <div className="max-h-[500px] space-y-3 overflow-y-auto pr-1">
-                    {positionShifts.map((shift, index) => (
-                      <div
-                        key={shift.id || index}
-                        className={`rounded-2xl border p-3 ${
-                          shift.isDefault
-                            ? 'border-[#FFB347]/35 bg-[#FFB347]/5'
-                            : shift.isActive
-                              ? 'border-white/10 bg-[#11152E]/50'
-                              : 'border-white/5 bg-white/[0.02] opacity-60'
-                        }`}
-                      >
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-white">
-                              Shift #{index + 1}
-                            </p>
-
-                            <p className="text-xs text-white/35">
-                              {shift.isDefault
-                                ? 'Default'
-                                : shift.isActive
-                                  ? 'Active'
-                                  : 'Inactive'}
-                            </p>
-                          </div>
-
-                          <div className="flex gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setDefaultShift(index)}
-                              className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
-                                shift.isDefault
-                                  ? 'bg-[#FFB347] text-[#1B1F3B]'
-                                  : 'bg-white/[0.06] text-white/55'
-                              }`}
-                            >
-                              Default
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => toggleShiftActive(index)}
-                              className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
-                                shift.isActive
-                                  ? 'bg-[#00B8A9]/10 text-[#00B8A9]'
-                                  : 'bg-white/[0.06] text-white/40'
-                              }`}
-                            >
-                              {shift.isActive ? 'Active' : 'Inactive'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => removeShift(index)}
-                              className="rounded-lg bg-red-400/10 px-2.5 py-1.5 text-[11px] font-bold text-red-300"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <input
-                            value={shift.name}
-                            onChange={(e) =>
-                              updateShift(index, 'name', e.target.value)
-                            }
-                            placeholder={
-                              index === 0
-                                ? `${positionForm.name || 'position'}_shift`
-                                : `${positionForm.name || 'position'}_shift_${
-                                    index + 1
-                                  }`
-                            }
-                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 sm:col-span-2"
-                          />
-
-                          <input
-                            type="time"
-                            value={shift.checkInTime}
-                            onChange={(e) =>
-                              updateShift(
-                                index,
-                                'checkInTime',
-                                e.target.value
-                              )
-                            }
-                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none"
-                          />
-
-                          <input
-                            type="time"
-                            value={shift.checkOutTime}
-                            onChange={(e) =>
-                              updateShift(
-                                index,
-                                'checkOutTime',
-                                e.target.value
-                              )
-                            }
-                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none"
-                          />
-
-                          <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                            <input
-                              type="checkbox"
-                              checked={shift.allowOT}
-                              onChange={(e) =>
-                                updateShift(
-                                  index,
-                                  'allowOT',
-                                  e.target.checked
-                                )
-                              }
-                              className="h-4 w-4 accent-[#FFB347]"
-                            />
-
-                            <span className="text-xs font-semibold text-white/65">
-                              Allow OT
-                            </span>
-                          </label>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={shift.otStartAfter}
-                              onChange={(e) =>
-                                updateShift(
-                                  index,
-                                  'otStartAfter',
-                                  e.target.value
-                                )
-                              }
-                              placeholder="OT after"
-                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25"
-                            />
-
-                            <input
-                              type="number"
-                              min="0"
-                              value={shift.otCapMinutes}
-                              onChange={(e) =>
-                                updateShift(
-                                  index,
-                                  'otCapMinutes',
-                                  e.target.value
-                                )
-                              }
-                              placeholder="OT cap"
-                              className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPositionModalOpen(false)
-                    resetPositionForm()
-                  }}
-                  className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={positionLoading}
-                  className="flex-1 rounded-xl bg-[#FFB347] px-4 py-3 text-sm font-bold text-[#1B1F3B] disabled:opacity-60"
-                >
-                  {positionLoading
-                    ? 'Saving...'
-                    : editingPositionId
-                      ? 'Update'
-                      : 'Add Position'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {isBranchModalOpen && (
-        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
-          <div className="flex min-h-dvh items-start justify-center py-6">
-            <form
-              onSubmit={hdlSubmit}
-              className="w-full max-w-4xl rounded-3xl border border-white/10 bg-[#11152E] p-5"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.25em] text-[#FFB347]">
-                    Branch Setup
-                  </p>
-
-                  <h2 className="mt-1 text-2xl font-bold text-white">
-                    {editingId ? 'Edit Branch' : 'Add Branch'}
-                  </h2>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsBranchModalOpen(false)
-                    setEditingId(null)
-                    setForm(DEFAULT_FORM)
-                  }}
-                  className="rounded-xl bg-white/[0.05] px-3 py-2 text-sm text-white/60"
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="mt-5 grid gap-4 lg:grid-cols-[300px_1fr]">
-                <div className="space-y-3">
-                  <input
-                    name="name"
-                    value={form.name}
-                    onChange={hdlChange}
-                    placeholder="Branch name"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
-                  />
-
-                  <input
-                    name="code"
-                    value={form.code}
-                    onChange={hdlChange}
-                    placeholder="Branch code"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
-                  />
-
-                  <textarea
-                    name="address"
-                    value={form.address}
-                    onChange={hdlChange}
-                    placeholder="Address"
-                    rows={3}
-                    className="w-full resize-none rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
-                  />
-
-                  <input
-                    name="radius"
-                    type="number"
-                    min="10"
-                    value={form.radius}
-                    onChange={hdlChange}
-                    placeholder="Radius"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30"
-                  />
-
-                  <div className="rounded-2xl border border-[#00B8A9]/15 bg-[#00B8A9]/10 p-3">
-                    <p className="text-xs font-bold text-[#00B8A9]">
-                      GPS Location
-                    </p>
-
-                    <p className="mt-1 text-xs text-white/45">
-                      Lat {Number(form.lat || 0).toFixed(5)} · Lng{' '}
-                      {Number(form.lng || 0).toFixed(5)}
-                    </p>
+                      <SearchControl onSelect={hdlSelectLocation} />
+                      <ChangeMapView position={position} />
+                      <LocationPicker
+                        position={position}
+                        radius={form.radius}
+                        onSelect={hdlSelectLocation}
+                      />
+                    </MapContainer>
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-white/10">
-                  <MapContainer
-                    center={[position.lat, position.lng]}
-                    zoom={15}
-                    scrollWheelZoom
-                    className="h-[460px] w-full"
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBranchModalOpen(false)
+                      setEditingId(null)
+                      setForm(DEFAULT_FORM)
+                    }}
+                    className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
                   >
-                    <TileLayer
-                      attribution="&copy; OpenStreetMap contributors"
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
+                    Cancel
+                  </button>
 
-                    <SearchControl onSelect={hdlSelectLocation} />
-                    <ChangeMapView position={position} />
-                    <LocationPicker
-                      position={position}
-                      radius={form.radius}
-                      onSelect={hdlSelectLocation}
-                    />
-                  </MapContainer>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 rounded-xl bg-[#FFB347] px-4 py-3 text-sm font-bold text-[#1B1F3B] disabled:opacity-60"
+                  >
+                    {loading
+                      ? 'Saving...'
+                      : editingId
+                        ? 'Update Branch'
+                        : 'Add Branch'}
+                  </button>
                 </div>
-              </div>
-
-              <div className="mt-5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsBranchModalOpen(false)
-                    setEditingId(null)
-                    setForm(DEFAULT_FORM)
-                  }}
-                  className="flex-1 rounded-xl bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white/70"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 rounded-xl bg-[#FFB347] px-4 py-3 text-sm font-bold text-[#1B1F3B] disabled:opacity-60"
-                >
-                  {loading
-                    ? 'Saving...'
-                    : editingId
-                      ? 'Update Branch'
-                      : 'Add Branch'}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  </div>
-)
+  )
 }
 
 export default OrganizationSettings

@@ -72,9 +72,7 @@ const WorkTimeRecordPage = () => {
 
       setPagination(res.data.pagination || null)
 
-      let recordsData = res.data.data || []
-
-      recordsData = recordsData
+      const recordsData = (res.data.data || [])
         .filter((record) => {
           if (!record) return false
 
@@ -85,18 +83,21 @@ const WorkTimeRecordPage = () => {
         })
         .map((record) => {
           const employeeId =
-            record.employeeId || record.employeesId || record.employee_id
+            record.employeeId ||
+            record.employeesId ||
+            record.employee_id ||
+            record.employees?.id
 
           return {
             ...record,
+            type: record.type || 'WORK',
             normalizedEmployeeId: employeeId,
           }
         })
         .filter(Boolean)
+        .sort((a, b) => new Date(b.checkIn) - new Date(a.checkIn))
 
-      setRecords(
-        recordsData.sort((a, b) => new Date(b.checkIn) - new Date(a.checkIn))
-      )
+      setRecords(recordsData)
     } catch (err) {
       console.error(err)
       setError('Failed to load time records')
@@ -157,7 +158,31 @@ const WorkTimeRecordPage = () => {
     return `${hours}h ${minutes}m`
   }
 
-  const getEmployeeName = (employeeId) => {
+  const formatOTMinutes = (minutes) => {
+    const total = Number(minutes || 0)
+
+    if (total <= 0) return '0 นาที'
+
+    const hours = Math.floor(total / 60)
+    const mins = total % 60
+
+    if (hours <= 0) return `${mins} นาที`
+    if (mins <= 0) return `${hours} ชม.`
+
+    return `${hours} ชม. ${mins} นาที`
+  }
+
+  const getEmployeeName = (record) => {
+    const employeeId = record.normalizedEmployeeId
+
+    if (record.employees) {
+      const firstname = record.employees.firstname || ''
+      const lastname = record.employees.lastname || ''
+      const fullName = `${firstname} ${lastname}`.trim()
+
+      if (fullName) return fullName
+    }
+
     if (!employeeId) return 'Unknown'
 
     const employee = employees.find((e) => String(e.id) === String(employeeId))
@@ -173,7 +198,62 @@ const WorkTimeRecordPage = () => {
   const timeBadgeBase =
     'inline-flex min-h-[30px] min-w-[96px] items-center justify-center rounded-full px-3 py-1 text-sm font-bold leading-none whitespace-nowrap'
 
-  const getLateBadge = (minutes) => {
+  const getTypeBadge = (type) => {
+    if (type === 'OT') {
+      return (
+        <span className={`${badgeBase} bg-cyan-400/10 text-cyan-300`}>
+          OT
+        </span>
+      )
+    }
+
+    return (
+      <span className={`${badgeBase} bg-[#00B8A9]/10 text-[#00B8A9]`}>
+        WORK
+      </span>
+    )
+  }
+
+  const getStatusBadge = (record, hasCheckOut) => {
+    if (record.type === 'OT') {
+      const status = record.status || 'ACTIVE'
+
+      const colorClass =
+        status === 'COMPLETED'
+          ? 'bg-cyan-400/10 text-cyan-300'
+          : status === 'ACTIVE'
+            ? 'bg-[#FFB347]/10 text-[#FFB347]'
+            : status === 'EXPIRED'
+              ? 'bg-orange-400/10 text-orange-300'
+              : status === 'CANCELLED'
+                ? 'bg-red-400/10 text-red-300'
+                : 'bg-white/[0.06] text-white/50'
+
+      return <span className={`${badgeBase} ${colorClass}`}>{status}</span>
+    }
+
+    return (
+      <span
+        className={`${badgeBase} ${
+          hasCheckOut
+            ? 'bg-[#00B8A9]/10 text-[#00B8A9]'
+            : 'bg-sky-400/10 text-sky-300'
+        }`}
+      >
+        {hasCheckOut ? 'COMPLETED' : 'ACTIVE'}
+      </span>
+    )
+  }
+
+  const getLateBadge = (minutes, type) => {
+    if (type === 'OT') {
+      return (
+        <span className={`${badgeBase} bg-white/[0.06] text-white/40`}>
+          -
+        </span>
+      )
+    }
+
     const late = Number(minutes || 0)
 
     if (late <= 0) {
@@ -191,7 +271,15 @@ const WorkTimeRecordPage = () => {
     )
   }
 
-  const getEarlyBadge = (minutes, hasCheckOut) => {
+  const getEarlyBadge = (minutes, hasCheckOut, type) => {
+    if (type === 'OT') {
+      return (
+        <span className={`${badgeBase} bg-white/[0.06] text-white/40`}>
+          -
+        </span>
+      )
+    }
+
     if (!hasCheckOut) {
       return (
         <span className={`${badgeBase} bg-sky-400/10 text-sky-300`}>
@@ -219,8 +307,8 @@ const WorkTimeRecordPage = () => {
     )
   }
 
-  const getOTBadge = (minutes, hasCheckOut) => {
-    if (!hasCheckOut) {
+  const getOTBadge = (record) => {
+    if (record.type !== 'OT') {
       return (
         <span className={`${badgeBase} bg-white/[0.06] text-white/40`}>
           -
@@ -228,9 +316,13 @@ const WorkTimeRecordPage = () => {
       )
     }
 
-    const ot = Number(minutes || 0)
+    const isCountable =
+      record.checkIn &&
+      record.checkOut &&
+      record.status !== 'CANCELLED' &&
+      record.status !== 'EXPIRED'
 
-    if (ot <= 0) {
+    if (!isCountable) {
       return (
         <span className={`${badgeBase} bg-white/[0.06] text-white/45`}>
           0 นาที
@@ -240,7 +332,7 @@ const WorkTimeRecordPage = () => {
 
     return (
       <span className={`${badgeBase} bg-cyan-400/10 text-cyan-300`}>
-        OT {ot} นาที
+        {formatOTMinutes(record.otMinutes || record.minutes || 0)}
       </span>
     )
   }
@@ -248,6 +340,14 @@ const WorkTimeRecordPage = () => {
   const shortNote = (note) => {
     if (!note) return '-'
     return note.length > 24 ? `${note.slice(0, 24)}...` : note
+  }
+
+  const getCheckInNote = (record) => {
+    return record.type === 'OT' ? record.noteIn : record.checkInNote
+  }
+
+  const getCheckOutNote = (record) => {
+    return record.type === 'OT' ? record.noteOut : record.checkOutNote
   }
 
   return (
@@ -342,12 +442,14 @@ const WorkTimeRecordPage = () => {
             </div>
           ) : (
             <div className="max-h-[70vh] w-full overflow-auto">
-              <table className="min-w-[1650px] w-full">
+              <table className="min-w-[1750px] w-full">
                 <thead className="sticky top-0 z-10 bg-[#11152E]">
                   <tr className="border-b border-white/10 text-left">
                     {[
                       'Employee',
                       'Date',
+                      'Type',
+                      'Status',
                       'Shift',
                       'Check In',
                       'Late',
@@ -370,18 +472,25 @@ const WorkTimeRecordPage = () => {
 
                 <tbody>
                   {records.map((record, index) => {
-                    const employeeId = record.normalizedEmployeeId
-                    const employeeName = getEmployeeName(employeeId)
+                    const isOT = record.type === 'OT'
+                    const employeeName = getEmployeeName(record)
                     const hasCheckOut =
                       record.checkOut &&
                       !isNaN(new Date(record.checkOut).getTime())
 
-                    const uniqueKey = `${employeeId || 'unknown'}-${record.date}-${record.checkIn}-${record.checkOut || 'active'}-${index}`
+                    const checkInNote = getCheckInNote(record)
+                    const checkOutNote = getCheckOutNote(record)
+
+                    const uniqueKey = `${record.type}-${record.id || index}-${
+                      record.checkIn || record.date
+                    }`
 
                     return (
                       <tr
                         key={uniqueKey}
-                        className="border-b border-white/5 transition hover:bg-white/[0.03]"
+                        className={`border-b border-white/5 transition hover:bg-white/[0.03] ${
+                          isOT ? 'bg-cyan-400/[0.025]' : ''
+                        }`}
                       >
                         <td className="whitespace-nowrap px-6 py-4 font-semibold text-white">
                           {employeeName}
@@ -390,12 +499,22 @@ const WorkTimeRecordPage = () => {
                         <td className="whitespace-nowrap px-6 py-4 text-white/60">
                           {record.date
                             ? format(new Date(record.date), 'MMM dd, yyyy')
-                            : 'N/A'}
+                            : record.checkIn
+                              ? format(new Date(record.checkIn), 'MMM dd, yyyy')
+                              : 'N/A'}
+                        </td>
+
+                        <td className="whitespace-nowrap px-6 py-4">
+                          {getTypeBadge(record.type)}
+                        </td>
+
+                        <td className="whitespace-nowrap px-6 py-4">
+                          {getStatusBadge(record, hasCheckOut)}
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
                           <span className={`${badgeBase} bg-cyan-400/10 text-cyan-300`}>
-                            {record.shift?.name || '-'}
+                            {isOT ? '-' : record.shift?.name || '-'}
                           </span>
                         </td>
 
@@ -408,7 +527,7 @@ const WorkTimeRecordPage = () => {
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
-                          {getLateBadge(record.lateMinutes)}
+                          {getLateBadge(record.lateMinutes, record.type)}
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
@@ -428,11 +547,15 @@ const WorkTimeRecordPage = () => {
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
-                          {getEarlyBadge(record.earlyLeaveMinutes, hasCheckOut)}
+                          {getEarlyBadge(
+                            record.earlyLeaveMinutes,
+                            hasCheckOut,
+                            record.type
+                          )}
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4">
-                          {getOTBadge(record.otMinutes, hasCheckOut)}
+                          {getOTBadge(record)}
                         </td>
 
                         <td className="whitespace-nowrap px-6 py-4 font-bold text-white">
@@ -440,18 +563,18 @@ const WorkTimeRecordPage = () => {
                         </td>
 
                         <td className="px-6 py-4">
-                          {record.checkInNote ? (
+                          {checkInNote ? (
                             <button
                               type="button"
                               onClick={() =>
                                 setSelectedNote({
-                                  title: 'Check-in Note',
-                                  content: record.checkInNote,
+                                  title: isOT ? 'OT Check-in Note' : 'Check-in Note',
+                                  content: checkInNote,
                                 })
                               }
                               className="block max-w-[190px] truncate rounded-xl bg-white/[0.04] px-3 py-2 text-left text-sm text-white/60 hover:bg-white/[0.08] hover:text-white"
                             >
-                              {shortNote(record.checkInNote)}
+                              {shortNote(checkInNote)}
                             </button>
                           ) : (
                             <span className="text-white/30">-</span>
@@ -459,18 +582,20 @@ const WorkTimeRecordPage = () => {
                         </td>
 
                         <td className="px-6 py-4">
-                          {record.checkOutNote ? (
+                          {checkOutNote ? (
                             <button
                               type="button"
                               onClick={() =>
                                 setSelectedNote({
-                                  title: 'Check-out Note',
-                                  content: record.checkOutNote,
+                                  title: isOT
+                                    ? 'OT Check-out Note'
+                                    : 'Check-out Note',
+                                  content: checkOutNote,
                                 })
                               }
                               className="block max-w-[190px] truncate rounded-xl bg-white/[0.04] px-3 py-2 text-left text-sm text-white/60 hover:bg-white/[0.08] hover:text-white"
                             >
-                              {shortNote(record.checkOutNote)}
+                              {shortNote(checkOutNote)}
                             </button>
                           ) : (
                             <span className="text-white/30">-</span>
