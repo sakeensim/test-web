@@ -17,6 +17,7 @@ function CheckIn() {
   const [shifts, setShifts] = useState([])
   const [selectedShiftId, setSelectedShiftId] = useState('')
   const [loadingShifts, setLoadingShifts] = useState(false)
+  const [canUseOT, setCanUseOT] = useState(false)
 
   const isOvertimeMode = selectedShiftId === 'OT'
 
@@ -44,7 +45,17 @@ function CheckIn() {
         },
       })
 
-      setShifts(res.data.result || res.data.data || [])
+      const shiftData = res.data.result || res.data.data || []
+
+      setShifts(shiftData)
+
+      const allowOTFromResponse =
+        res.data.allowOT ??
+        res.data.position?.allowOT ??
+        shiftData[0]?.position?.allowOT ??
+        false
+
+      setCanUseOT(Boolean(allowOTFromResponse))
     } catch (error) {
       console.error('Fetch shifts failed:', error)
       createAlert(
@@ -78,7 +89,12 @@ function CheckIn() {
     e.preventDefault()
 
     if (!selectedShiftId) {
-      createAlert('error', 'กรุณาเลือกกะทำงานหรือเลือกเริ่ม OT')
+      createAlert('error', 'กรุณาเลือกกะทำงานก่อน Check-in')
+      return
+    }
+
+    if (selectedShiftId === 'OT' && !canUseOT) {
+      createAlert('error', 'ตำแหน่งนี้ไม่สามารถทำ OT ได้')
       return
     }
 
@@ -182,7 +198,7 @@ function CheckIn() {
               </h2>
 
               <p className="mt-2 text-sm text-white/40">
-                เลือกกะทำงานสำหรับเวลาปกติ หรือเลือก OT เพื่อเริ่มทำงานล่วงเวลา
+                เลือกกะทำงานเพื่อเริ่มบันทึกเวลา
               </p>
             </div>
 
@@ -230,7 +246,7 @@ function CheckIn() {
                   className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#11152E] px-4 text-sm font-semibold text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="" className="bg-[#11152E]">
-                    {loadingShifts ? 'กำลังโหลดข้อมูล...' : 'เลือกกะทำงาน / OT'}
+                    {loadingShifts ? 'กำลังโหลดข้อมูล...' : 'เลือกกะทำงาน'}
                   </option>
 
                   {shifts.map((shift) => (
@@ -244,14 +260,16 @@ function CheckIn() {
                     </option>
                   ))}
 
-                  <option value="OT" className="bg-[#11152E]">
-                    OT
-                  </option>
+                  {canUseOT && (
+                    <option value="OT" className="bg-[#11152E]">
+                      OT
+                    </option>
+                  )}
                 </select>
 
                 {shifts.length === 0 && !loadingShifts && (
                   <p className="mt-2 text-xs text-red-300">
-                    ยังไม่มีกะทำงานสำหรับตำแหน่งนี้ แต่สามารถเลือก OT ได้ถ้าตำแหน่งนี้มีสิทธิ์ทำ OT
+                    ยังไม่มีกะทำงานสำหรับตำแหน่งนี้ กรุณาติดต่อแอดมิน
                   </p>
                 )}
               </div>

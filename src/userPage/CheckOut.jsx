@@ -15,9 +15,12 @@ function CheckOut() {
   const [now, setNow] = useState(new Date())
   const [note, setNote] = useState('')
   const [checkoutType, setCheckoutType] = useState('')
+  const [canUseOT, setCanUseOT] = useState(false)
+  const [activeOvertime, setActiveOvertime] = useState(null)
 
   const currentShift = time?.shift || null
   const isOvertimeMode = checkoutType === 'OT'
+  const showOTOption = canUseOT && activeOvertime
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -26,6 +29,39 @@ function CheckOut() {
 
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (token) {
+      fetchOTStatus()
+    }
+  }, [token])
+
+  const fetchOTStatus = async () => {
+    try {
+      const [historyRes, activeOTRes] = await Promise.allSettled([
+        axios.get(`${API_URL}/user/history`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        axios.get(`${API_URL}/user/overtime/active`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ])
+
+      if (historyRes.status === 'fulfilled') {
+        setCanUseOT(Boolean(historyRes.value.data?.profile?.position?.allowOT))
+      }
+
+      if (activeOTRes.status === 'fulfilled') {
+        setActiveOvertime(activeOTRes.value.data?.data || null)
+      }
+    } catch (error) {
+      console.error('Fetch OT status failed:', error)
+    }
+  }
 
   const endOvertime = async (latitude, longitude) => {
     const res = await axios.patch(
@@ -53,6 +89,11 @@ function CheckOut() {
       return
     }
 
+    if (checkoutType === 'OT' && !showOTOption) {
+      createAlert('error', 'ไม่พบ OT ที่กำลังทำอยู่')
+      return
+    }
+
     if (!navigator.geolocation) {
       createAlert('error', 'อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง')
       return
@@ -68,6 +109,8 @@ function CheckOut() {
 
             console.log('End OT response:', res)
             createAlert('success', 'จบ OT สำเร็จ')
+            setCheckoutType('')
+            fetchOTStatus()
             return
           }
 
@@ -75,6 +118,7 @@ function CheckOut() {
 
           console.log('Check-out response:', res)
           createAlert('success', 'ลงชื่อออก สำเร็จ')
+          setCheckoutType('')
         } catch (error) {
           console.error('Check-out failed:', error)
 
@@ -199,7 +243,7 @@ function CheckOut() {
                   className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#11152E] px-4 text-sm font-semibold text-white outline-none"
                 >
                   <option value="" className="bg-[#11152E]">
-                    เลือกกะออกงาน / OT
+                    เลือกกะออกงาน
                   </option>
 
                   <option value="WORK" className="bg-[#11152E]">
@@ -208,10 +252,18 @@ function CheckOut() {
                       : 'Check-out งานประจำ'}
                   </option>
 
-                  <option value="OT" className="bg-[#11152E]">
-                    OT
-                  </option>
+                  {showOTOption && (
+                    <option value="OT" className="bg-[#11152E]">
+                      OT
+                    </option>
+                  )}
                 </select>
+
+                {activeOvertime && (
+                  <p className="mt-2 text-xs text-cyan-300">
+                    มี OT ที่กำลังทำอยู่ สามารถเลือก OT เพื่อจบงานล่วงเวลาได้
+                  </p>
+                )}
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
