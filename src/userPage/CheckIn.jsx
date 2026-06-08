@@ -48,16 +48,10 @@ function CheckIn() {
       const shiftData = res.data.result || res.data.data || []
 
       setShifts(shiftData)
-
-      const allowOTFromResponse =
-        res.data.allowOT ??
-        res.data.position?.allowOT ??
-        shiftData[0]?.position?.allowOT ??
-        false
-
-      setCanUseOT(Boolean(allowOTFromResponse))
+      setCanUseOT(Boolean(res.data.allowOT))
     } catch (error) {
       console.error('Fetch shifts failed:', error)
+      setCanUseOT(false)
       createAlert(
         'error',
         error.response?.data?.message || 'โหลดกะทำงานไม่สำเร็จ'
