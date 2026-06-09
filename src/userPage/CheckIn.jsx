@@ -18,6 +18,7 @@ function CheckIn() {
   const [selectedShiftId, setSelectedShiftId] = useState('')
   const [loadingShifts, setLoadingShifts] = useState(false)
   const [canUseOT, setCanUseOT] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const isOvertimeMode = selectedShiftId === 'OT'
 
@@ -82,6 +83,8 @@ function CheckIn() {
   const hdlSubmit = async (e) => {
     e.preventDefault()
 
+    if (submitting) return
+
     if (!selectedShiftId) {
       createAlert('error', 'กรุณาเลือกกะทำงานก่อน Check-in')
       return
@@ -97,6 +100,8 @@ function CheckIn() {
       return
     }
 
+    setSubmitting(true)
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
@@ -104,6 +109,7 @@ function CheckIn() {
 
           if (isOvertimeMode) {
             const res = await startOvertime(latitude, longitude)
+
             console.log('Start OT response:', res)
             createAlert('success', 'เริ่ม OT สำเร็จ')
             return
@@ -137,13 +143,17 @@ function CheckIn() {
 
           createAlert(
             'error',
-            message || (isOvertimeMode ? 'เริ่ม OT ล้มเหลว' : 'Check-in ล้มเหลว')
+            message ||
+              (isOvertimeMode ? 'เริ่ม OT ล้มเหลว' : 'Check-in ล้มเหลว')
           )
+        } finally {
+          setSubmitting(false)
         }
       },
       (error) => {
         console.error('Location error:', error)
         createAlert('error', 'กรุณาอนุญาตให้เข้าถึงตำแหน่ง')
+        setSubmitting(false)
       },
       {
         enableHighAccuracy: true,
@@ -236,7 +246,7 @@ function CheckIn() {
                 <select
                   value={selectedShiftId}
                   onChange={(e) => setSelectedShiftId(e.target.value)}
-                  disabled={loadingShifts}
+                  disabled={loadingShifts || submitting}
                   className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#11152E] px-4 text-sm font-semibold text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="" className="bg-[#11152E]">
@@ -273,25 +283,31 @@ function CheckIn() {
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
+                  disabled={submitting}
                   placeholder={
                     isOvertimeMode
                       ? 'เช่น ช่วยปิดร้าน / งานจัดเลี้ยง / เคลียร์ออเดอร์'
                       : 'เช่น รถติด / ไปทำงานนอกสถานที่ / เหตุผลเพิ่มเติม'
                   }
                   rows={3}
-                  className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+                  className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
 
               <button
                 type="submit"
-                className={`mt-2 flex h-14 w-full items-center justify-center rounded-2xl text-base font-bold shadow-[0_0_30px_rgba(0,184,169,0.22)] transition hover:scale-[1.01] active:scale-[0.98] ${
+                disabled={submitting}
+                className={`mt-2 flex h-14 w-full items-center justify-center rounded-2xl text-base font-bold shadow-[0_0_30px_rgba(0,184,169,0.22)] transition hover:scale-[1.01] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
                   isOvertimeMode
                     ? 'bg-cyan-300 text-[#11152E]'
                     : 'bg-[#00B8A9] text-[#1B1F3B]'
                 }`}
               >
-                {isOvertimeMode ? 'Start OT' : 'Check-In'}
+                {submitting
+                  ? 'กำลังบันทึก...'
+                  : isOvertimeMode
+                    ? 'Start OT'
+                    : 'Check-In'}
               </button>
             </form>
 

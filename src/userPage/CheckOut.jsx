@@ -17,6 +17,7 @@ function CheckOut() {
   const [checkoutType, setCheckoutType] = useState('')
   const [canUseOT, setCanUseOT] = useState(false)
   const [activeOvertime, setActiveOvertime] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const currentShift = time?.shift || null
   const isOvertimeMode = checkoutType === 'OT'
@@ -40,14 +41,10 @@ function CheckOut() {
     try {
       const [historyRes, activeOTRes] = await Promise.allSettled([
         axios.get(`${API_URL}/user/history`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`${API_URL}/user/overtime/active`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }),
       ])
 
@@ -72,9 +69,7 @@ function CheckOut() {
         noteOut: note,
       },
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     )
 
@@ -83,6 +78,8 @@ function CheckOut() {
 
   const hdlSubmit = async (e) => {
     e.preventDefault()
+
+    if (submitting) return
 
     if (!checkoutType) {
       createAlert('error', 'กรุณาเลือกประเภทการออกงานก่อน Check-out')
@@ -99,6 +96,8 @@ function CheckOut() {
       return
     }
 
+    setSubmitting(true)
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
@@ -110,7 +109,7 @@ function CheckOut() {
             console.log('End OT response:', res)
             createAlert('success', 'จบ OT สำเร็จ')
             setCheckoutType('')
-            fetchOTStatus()
+            await fetchOTStatus()
             return
           }
 
@@ -139,11 +138,14 @@ function CheckOut() {
             'error',
             message || (isOvertimeMode ? 'จบ OT ล้มเหลว' : 'Check-out ล้มเหลว')
           )
+        } finally {
+          setSubmitting(false)
         }
       },
       (error) => {
         console.error('Location error:', error)
         createAlert('error', 'กรุณาอนุญาตให้เข้าถึงตำแหน่ง')
+        setSubmitting(false)
       },
       {
         enableHighAccuracy: true,
@@ -240,7 +242,8 @@ function CheckOut() {
                 <select
                   value={checkoutType}
                   onChange={(e) => setCheckoutType(e.target.value)}
-                  className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#11152E] px-4 text-sm font-semibold text-white outline-none"
+                  disabled={submitting}
+                  className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#11152E] px-4 text-sm font-semibold text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="" className="bg-[#11152E]">
                     เลือกกะออกงาน
@@ -271,25 +274,31 @@ function CheckOut() {
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
+                  disabled={submitting}
                   placeholder={
                     isOvertimeMode
                       ? 'เช่น จบงานจัดเลี้ยง / ปิดร้านเรียบร้อย / เคลียร์ออเดอร์เสร็จ'
                       : 'เช่น ออกก่อนเวลา / มีธุระ / เหตุผลเพิ่มเติม'
                   }
                   rows={3}
-                  className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+                  className="mt-2 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
 
               <button
                 type="submit"
-                className={`mt-2 flex h-14 w-full items-center justify-center rounded-2xl text-base font-bold transition hover:scale-[1.01] active:scale-[0.98] ${
+                disabled={submitting}
+                className={`mt-2 flex h-14 w-full items-center justify-center rounded-2xl text-base font-bold transition hover:scale-[1.01] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
                   isOvertimeMode
                     ? 'bg-cyan-300 text-[#11152E] shadow-[0_0_30px_rgba(103,232,249,0.22)]'
                     : 'bg-[#FFB347] text-[#1B1F3B] shadow-[0_0_30px_rgba(255,179,71,0.22)]'
                 }`}
               >
-                {isOvertimeMode ? 'End OT' : 'Check-Out'}
+                {submitting
+                  ? 'กำลังบันทึก...'
+                  : isOvertimeMode
+                    ? 'End OT'
+                    : 'Check-Out'}
               </button>
             </form>
 
