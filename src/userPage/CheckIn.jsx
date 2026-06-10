@@ -112,6 +112,8 @@ function CheckIn() {
 
             console.log('Start OT response:', res)
             createAlert('success', 'เริ่ม OT สำเร็จ')
+            setSelectedShiftId('')
+            setNote('')
             return
           }
 
@@ -125,6 +127,8 @@ function CheckIn() {
 
           console.log('Check-in response:', res)
           createAlert('success', 'ลงชื่อเข้า สำเร็จ')
+          setSelectedShiftId('')
+          setNote('')
         } catch (error) {
           console.error('Check-in / OT failed:', error)
 
