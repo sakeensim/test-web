@@ -68,28 +68,53 @@ function Profile() {
     }
   }
 
-  const fetchApprovedRequests = async () => {
+    const fetchApprovedRequests = async () => {
     try {
-      const res = await axios.get(`${API_URL}/user/approved-requests`, {
+        const res = await axios.get(`${API_URL}/user/approved-requests`, {
         headers: { Authorization: `Bearer ${token}` },
-      })
+        })
 
-      const approvedDayOffs = res.data.data.filter(
+        const requests = res.data.data || []
+
+        const now = new Date()
+        const currentMonth = now.getMonth()
+        const currentYear = now.getFullYear()
+
+        const approvedDayOffs = requests.filter(
         (request) => request.type === 'dayoff'
-      )
+        )
 
-      setDayOffDates(
+        setDayOffDates(
         approvedDayOffs.map((dayOff) => ({
-          id: dayOff.id,
-          date: dayOff.date,
+            id: dayOff.id,
+            date: dayOff.date,
         }))
-      )
+        )
 
-      setTotalSalaryAdvance(res.data.totalSalaryAdvance || 0)
+        const thisMonthAdvance = requests
+        .filter((request) => {
+            const isAdvance =
+            request.type === 'advanceSalary' ||
+            request.type === 'salaryAdvance' ||
+            request.type === 'advance'
+
+            const requestDate = new Date(request.requestDate || request.date)
+
+            return (
+            isAdvance &&
+            requestDate.getMonth() === currentMonth &&
+            requestDate.getFullYear() === currentYear
+            )
+        })
+        .reduce((sum, request) => {
+            return sum + Number(request.amount || 0)
+        }, 0)
+
+        setTotalSalaryAdvance(thisMonthAdvance)
     } catch (error) {
-      console.log('Error fetching approved requests:', error)
+        console.log('Error fetching approved requests:', error)
     }
-  }
+    }
 
   const deleteDayOff = async (dayOffId) => {
     try {
