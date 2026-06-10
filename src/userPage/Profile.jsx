@@ -94,9 +94,10 @@ function Profile() {
         const thisMonthAdvance = requests
         .filter((request) => {
             const isAdvance =
-            request.type === 'advanceSalary' ||
-            request.type === 'salaryAdvance' ||
-            request.type === 'advance'
+                request.type === 'salary' ||
+                request.type === 'advanceSalary' ||
+                request.type === 'salaryAdvance' ||
+                request.type === 'advance'
 
             const requestDate = new Date(request.requestDate || request.date)
 
