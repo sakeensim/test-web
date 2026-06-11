@@ -39,6 +39,7 @@ function CalendarPage() {
   const [events, setEvents] = useState([])
   const [branches, setBranches] = useState([])
   const [selectedBranch, setSelectedBranch] = useState('all')
+  const [calendarDate, setCalendarDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
 
   const [selectedDate, setSelectedDate] = useState(null)
@@ -62,7 +63,7 @@ function CalendarPage() {
     if (isAdmin) {
       fetchBranches()
     }
-  }, [token, selectedBranch, user?.role, location.pathname])
+  }, [token, selectedBranch, user?.role, location.pathname, calendarDate])
 
   const fetchBranches = async () => {
     try {
@@ -80,10 +81,13 @@ function CalendarPage() {
     try {
       setLoading(true)
 
+      const month = moment(calendarDate).month() + 1
+      const year = moment(calendarDate).year()
+
       const url =
         isAdminPage && isAdmin
-          ? `${API_URL}/calendar/admin?branchId=${selectedBranch}`
-          : `${API_URL}/calendar/user`
+          ? `${API_URL}/calendar/admin?branchId=${selectedBranch}&month=${month}&year=${year}`
+          : `${API_URL}/calendar/user?month=${month}&year=${year}`
 
       const res = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -157,10 +161,16 @@ function CalendarPage() {
     setSelectedDayEvents(moreEvents)
   }
 
+  const handleNavigate = (newDate) => {
+    setCalendarDate(newDate)
+    setSelectedDate(null)
+    setSelectedDayEvents([])
+  }
+
   const openAddNoteModal = (date = selectedDate) => {
     setNoteForm({
       ...DEFAULT_NOTE_FORM,
-      date: moment(date || new Date()).format('YYYY-MM-DD'),
+      date: moment(date || calendarDate || new Date()).format('YYYY-MM-DD'),
       branchId:
         isAdmin && selectedBranch !== 'all'
           ? selectedBranch
@@ -216,14 +226,18 @@ function CalendarPage() {
       }
 
       if (noteForm.id) {
-        await axios.patch(`${API_URL}/admin/calendar-note/${noteForm.id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        await axios.patch(
+          `${API_URL}/admin/calendar-note/${noteForm.id}`,
+          payload,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
 
         createAlert('success', 'แก้ไข note สำเร็จ')
       } else {
         await axios.post(`${API_URL}/admin/calendar-note`, payload, {
-            headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         })
 
         createAlert('success', 'เพิ่ม note สำเร็จ')
@@ -546,6 +560,8 @@ function CalendarPage() {
               <Calendar
                 localizer={localizer}
                 events={events}
+                date={calendarDate}
+                onNavigate={handleNavigate}
                 startAccessor="start"
                 endAccessor="end"
                 views={['month', 'week', 'day']}
