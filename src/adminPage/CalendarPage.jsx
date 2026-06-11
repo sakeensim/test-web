@@ -222,8 +222,8 @@ function CalendarPage() {
 
         createAlert('success', 'แก้ไข note สำเร็จ')
       } else {
-        await axios.post(`${API_URL}/calendar-note`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
+        await axios.post(`${API_URL}/admin/calendar-note`, payload, {
+            headers: { Authorization: `Bearer ${token}` },
         })
 
         createAlert('success', 'เพิ่ม note สำเร็จ')
