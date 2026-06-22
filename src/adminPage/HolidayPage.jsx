@@ -4,7 +4,14 @@ import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
 import API_URL from '../utils/api'
 import useAuthStore from '../store/auth-store'
-import { Trash2, Plus, CalendarDays, Search, Info } from 'lucide-react'
+import {
+  Trash2,
+  Plus,
+  CalendarDays,
+  Search,
+  Pencil,
+  X,
+} from 'lucide-react'
 import { createAlert } from '../utils/createAlert'
 
 function HolidayPage() {
@@ -19,6 +26,7 @@ function HolidayPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const [editingHoliday, setEditingHoliday] = useState(null)
 
   useEffect(() => {
     if (token) {
@@ -83,7 +91,29 @@ function HolidayPage() {
     return dates
   }
 
+  const resetForm = () => {
+    setSelectedRange(undefined)
+    setSelectedBranchIds([])
+    setTitle('')
+    setEditingHoliday(null)
+  }
+
+  const startEditHoliday = (holiday) => {
+    setEditingHoliday(holiday)
+    setSelectedRange({
+      from: new Date(holiday.date),
+      to: new Date(holiday.date),
+    })
+    setSelectedBranchIds([holiday.branchId])
+    setTitle(holiday.title || '')
+  }
+
   const toggleBranch = (branchId) => {
+    if (editingHoliday) {
+      setSelectedBranchIds([branchId])
+      return
+    }
+
     setSelectedBranchIds((prev) =>
       prev.includes(branchId)
         ? prev.filter((id) => id !== branchId)
@@ -92,6 +122,7 @@ function HolidayPage() {
   }
 
   const selectAllBranches = () => {
+    if (editingHoliday) return
     setSelectedBranchIds(branches.map((branch) => branch.id))
   }
 
@@ -99,7 +130,7 @@ function HolidayPage() {
     setSelectedBranchIds([])
   }
 
-  const createHoliday = async (e) => {
+  const saveHoliday = async (e) => {
     e.preventDefault()
 
     const dates = getDatesInRange(selectedRange)
@@ -131,32 +162,47 @@ function HolidayPage() {
     try {
       setLoading(true)
 
-      for (const branchId of selectedBranchIds) {
-        for (const date of dates) {
-          await axios.post(
-            `${API_URL}/admin/holiday`,
-            {
-              date,
-              title,
-              branchId,
-            },
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          )
+      if (editingHoliday) {
+        await axios.patch(
+          `${API_URL}/admin/holiday/${editingHoliday.id}`,
+          {
+            date: dates[0],
+            title,
+            branchId: selectedBranchIds[0],
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+
+        createAlert('success', 'แก้ไขวันหยุดสำเร็จ')
+      } else {
+        for (const branchId of selectedBranchIds) {
+          for (const date of dates) {
+            await axios.post(
+              `${API_URL}/admin/holiday`,
+              {
+                date,
+                title,
+                branchId,
+              },
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            )
+          }
         }
+
+        createAlert('success', 'เพิ่มวันหยุดสำเร็จ')
       }
 
-      setSelectedRange(undefined)
-      setSelectedBranchIds([])
-      setTitle('')
-      createAlert('success', 'เพิ่มวันหยุดสำเร็จ')
+      resetForm()
       fetchHolidays()
     } catch (error) {
       console.log(error)
       createAlert(
         'error',
-        error.response?.data?.message || 'เพิ่มวันหยุดไม่สำเร็จ'
+        error.response?.data?.message || 'บันทึกวันหยุดไม่สำเร็จ'
       )
     } finally {
       setLoading(false)
@@ -168,6 +214,10 @@ function HolidayPage() {
       await axios.delete(`${API_URL}/admin/holiday/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
+
+      if (editingHoliday?.id === id) {
+        resetForm()
+      }
 
       createAlert('success', 'ลบวันหยุดสำเร็จ')
       fetchHolidays()
@@ -232,116 +282,116 @@ function HolidayPage() {
   return (
     <div className="min-h-dvh w-full p-4 sm:p-6">
       <style>
-  {`
-    .workpal-calendar {
-      --rdp-accent-color: #8B7355;
-      --rdp-selected-color: #F5E7D4;
-      width: 100%;
-    }
+        {`
+          .workpal-calendar {
+            --rdp-accent-color: #8B7355;
+            --rdp-selected-color: #F5E7D4;
+            width: 100%;
+          }
 
-    .workpal-calendar .rdp-months {
-      justify-content: center;
-    }
+          .workpal-calendar .rdp-months {
+            justify-content: center;
+          }
 
-    .workpal-calendar .rdp-month {
-      width: 100%;
-    }
+          .workpal-calendar .rdp-month {
+            width: 100%;
+          }
 
-    .workpal-calendar .rdp-caption_label,
-    .workpal-calendar .rdp-month_caption {
-      color: #F8FAFC;
-      font-weight: 900;
-      font-size: 18px;
-    }
+          .workpal-calendar .rdp-caption_label,
+          .workpal-calendar .rdp-month_caption {
+            color: #F8FAFC;
+            font-weight: 900;
+            font-size: 18px;
+          }
 
-    .workpal-calendar .rdp-nav button,
-    .workpal-calendar .rdp-button_previous,
-    .workpal-calendar .rdp-button_next {
-      color: #F6B546 !important;
-    }
+          .workpal-calendar .rdp-nav button,
+          .workpal-calendar .rdp-button_previous,
+          .workpal-calendar .rdp-button_next {
+            color: #F6B546 !important;
+          }
 
-    .workpal-calendar .rdp-chevron {
-      fill: #F6B546 !important;
-    }
+          .workpal-calendar .rdp-chevron {
+            fill: #F6B546 !important;
+          }
 
-    .workpal-calendar .rdp-weekday {
-      color: rgba(248,250,252,0.45);
-      font-weight: 800;
-      font-size: 13px;
-    }
+          .workpal-calendar .rdp-weekday {
+            color: rgba(248,250,252,0.45);
+            font-weight: 800;
+            font-size: 13px;
+          }
 
-    .workpal-calendar .rdp-day {
-      background: transparent !important;
-    }
+          .workpal-calendar .rdp-day {
+            background: transparent !important;
+          }
 
-    .workpal-calendar .rdp-day_button {
-      width: 42px;
-      height: 42px;
-      border-radius: 14px;
-      color: rgba(248,250,252,0.82);
-      font-weight: 800;
-      border: 1px solid transparent;
-      transition: 160ms ease;
-      background: transparent !important;
-    }
+          .workpal-calendar .rdp-day_button {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            color: rgba(248,250,252,0.82);
+            font-weight: 800;
+            border: 1px solid transparent;
+            transition: 160ms ease;
+            background: transparent !important;
+          }
 
-    .workpal-calendar .rdp-day_button:hover {
-      background: rgba(139,115,85,0.18) !important;
-      border-color: rgba(246,181,70,0.25);
-      color: #F5E7D4 !important;
-    }
+          .workpal-calendar .rdp-day_button:hover {
+            background: rgba(139,115,85,0.18) !important;
+            border-color: rgba(246,181,70,0.25);
+            color: #F5E7D4 !important;
+          }
 
-    .workpal-calendar .rdp-disabled .rdp-day_button {
-      color: rgba(248,250,252,0.16) !important;
-      background: transparent !important;
-      opacity: 1;
-    }
+          .workpal-calendar .rdp-disabled .rdp-day_button {
+            color: rgba(248,250,252,0.16) !important;
+            background: transparent !important;
+            opacity: 1;
+          }
 
-    .workpal-calendar .rdp-today .rdp-day_button {
-      border-color: rgba(246,181,70,0.55);
-      color: #F6B546 !important;
-    }
+          .workpal-calendar .rdp-today .rdp-day_button {
+            border-color: rgba(246,181,70,0.55);
+            color: #F6B546 !important;
+          }
 
-    .workpal-calendar .rdp-range_middle,
-    .workpal-calendar .rdp-day_range_middle {
-      background: rgba(122,104,82,0.24) !important;
-    }
+          .workpal-calendar .rdp-range_middle,
+          .workpal-calendar .rdp-day_range_middle {
+            background: rgba(122,104,82,0.24) !important;
+          }
 
-    .workpal-calendar .rdp-range_middle .rdp-day_button,
-    .workpal-calendar .rdp-day_range_middle .rdp-day_button {
-      background: rgba(122,104,82,0.24) !important;
-      color: #D6C7B2 !important;
-      border-radius: 8px !important;
-      box-shadow: none !important;
-    }
+          .workpal-calendar .rdp-range_middle .rdp-day_button,
+          .workpal-calendar .rdp-day_range_middle .rdp-day_button {
+            background: rgba(122,104,82,0.24) !important;
+            color: #D6C7B2 !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+          }
 
-    .workpal-calendar .rdp-selected,
-    .workpal-calendar .rdp-range_start,
-    .workpal-calendar .rdp-range_end,
-    .workpal-calendar .rdp-day_selected,
-    .workpal-calendar .rdp-day_range_start,
-    .workpal-calendar .rdp-day_range_end {
-      background: transparent !important;
-    }
+          .workpal-calendar .rdp-selected,
+          .workpal-calendar .rdp-range_start,
+          .workpal-calendar .rdp-range_end,
+          .workpal-calendar .rdp-day_selected,
+          .workpal-calendar .rdp-day_range_start,
+          .workpal-calendar .rdp-day_range_end {
+            background: transparent !important;
+          }
 
-    .workpal-calendar .rdp-selected .rdp-day_button,
-    .workpal-calendar .rdp-range_start .rdp-day_button,
-    .workpal-calendar .rdp-range_end .rdp-day_button,
-    .workpal-calendar .rdp-day_selected .rdp-day_button,
-    .workpal-calendar .rdp-day_range_start .rdp-day_button,
-    .workpal-calendar .rdp-day_range_end .rdp-day_button {
-      background: #7A6852 !important;
-      color: #F5E7D4 !important;
-      font-weight: 900 !important;
-      border-color: rgba(246,181,70,0.45) !important;
-      box-shadow: 0 0 0 4px rgba(122,104,82,0.2);
-    }
+          .workpal-calendar .rdp-selected .rdp-day_button,
+          .workpal-calendar .rdp-range_start .rdp-day_button,
+          .workpal-calendar .rdp-range_end .rdp-day_button,
+          .workpal-calendar .rdp-day_selected .rdp-day_button,
+          .workpal-calendar .rdp-day_range_start .rdp-day_button,
+          .workpal-calendar .rdp-day_range_end .rdp-day_button {
+            background: #7A6852 !important;
+            color: #F5E7D4 !important;
+            font-weight: 900 !important;
+            border-color: rgba(246,181,70,0.45) !important;
+            box-shadow: 0 0 0 4px rgba(122,104,82,0.2);
+          }
 
-    .workpal-calendar .holiday-day .rdp-day_button {
-      color: #34D399 !important;
-    }
-  `}
-</style>
+          .workpal-calendar .holiday-day .rdp-day_button {
+            color: #34D399 !important;
+          }
+        `}
+      </style>
 
       <div className="mx-auto max-w-7xl">
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -429,11 +479,16 @@ function HolidayPage() {
                     holidayDate.setHours(0, 0, 0, 0)
 
                     const isPast = holidayDate < today
+                    const isEditing = editingHoliday?.id === holiday.id
 
                     return (
                       <div
                         key={holiday.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-[#1E293B]/70 p-4 transition hover:border-[#F6B546]/30"
+                        className={`flex items-center justify-between gap-3 rounded-2xl border p-4 transition ${
+                          isEditing
+                            ? 'border-[#F6B546]/60 bg-[#F6B546]/10'
+                            : 'border-white/5 bg-[#1E293B]/70 hover:border-[#F6B546]/30'
+                        }`}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -464,13 +519,23 @@ function HolidayPage() {
                           </p>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => deleteHoliday(holiday.id)}
-                          className="shrink-0 rounded-xl bg-red-400/10 p-3 text-red-300 transition hover:bg-red-400/20"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEditHoliday(holiday)}
+                            className="rounded-xl bg-[#F6B546]/10 p-3 text-[#F6B546] transition hover:bg-[#F6B546]/20"
+                          >
+                            <Pencil size={16} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => deleteHoliday(holiday.id)}
+                            className="rounded-xl bg-red-400/10 p-3 text-red-300 transition hover:bg-red-400/20"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     )
                   })}
@@ -495,7 +560,9 @@ function HolidayPage() {
                 </h2>
 
                 <p className="text-sm text-white/40">
-                  เลือกช่วงวันและสาขาที่ต้องการเพิ่มวันหยุด
+                  {editingHoliday
+                    ? 'กำลังแก้ไขวันหยุดที่เลือก'
+                    : 'เลือกช่วงวันและสาขาที่ต้องการเพิ่มวันหยุด'}
                 </p>
               </div>
             </div>
@@ -518,7 +585,7 @@ function HolidayPage() {
               </div>
 
               <form
-                onSubmit={createHoliday}
+                onSubmit={saveHoliday}
                 className="rounded-[1.5rem] border border-white/10 bg-[#1E293B]/50 p-5"
               >
                 <div className="mb-6 flex items-center justify-between">
@@ -528,11 +595,13 @@ function HolidayPage() {
                     </p>
 
                     <h2 className="mt-2 text-2xl font-black text-white">
-                      Add Holiday
+                      {editingHoliday ? 'Edit Holiday' : 'Add Holiday'}
                     </h2>
 
                     <p className="mt-1 text-sm text-white/40">
-                      เพิ่มวันหยุดหลายสาขา
+                      {editingHoliday
+                        ? 'แก้ไขวันหยุดได้ทีละ 1 รายการ'
+                        : 'เพิ่มวันหยุดหลายสาขา'}
                     </p>
                   </div>
 
@@ -550,29 +619,44 @@ function HolidayPage() {
                     <div className="flex min-h-12 items-center rounded-2xl border border-white/10 bg-[#111827]/70 px-4 py-3 font-semibold text-white">
                       {selectedDateText}
                     </div>
+
+                    {editingHoliday && (
+                      <p className="mt-2 text-xs text-[#F6B546]/80">
+                        โหมดแก้ไขจะใช้วันที่แรกที่เลือกเท่านั้น
+                      </p>
+                    )}
                   </div>
 
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs text-white/40">Branches</p>
+                      <p className="text-xs text-white/40">
+                        Branches
+                        {editingHoliday && (
+                          <span className="ml-2 text-[#F6B546]/80">
+                            เลือกได้ 1 สาขา
+                          </span>
+                        )}
+                      </p>
 
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={selectAllBranches}
-                          className="text-xs font-semibold text-[#34D399]"
-                        >
-                          Select all
-                        </button>
+                      {!editingHoliday && (
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={selectAllBranches}
+                            className="text-xs font-semibold text-[#34D399]"
+                          >
+                            Select all
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={clearBranches}
-                          className="text-xs font-semibold text-red-300"
-                        >
-                          Clear
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            onClick={clearBranches}
+                            className="text-xs font-semibold text-red-300"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="max-h-[170px] space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-[#111827]/70 p-3">
@@ -620,15 +704,29 @@ function HolidayPage() {
                     />
                   </div>
 
-
                   <button
                     type="submit"
                     disabled={loading}
                     className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#F6B546] font-bold text-[#111827] shadow-[0_0_30px_rgba(246,181,70,0.25)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Plus size={18} />
-                    {loading ? 'Adding...' : 'Add Holiday'}
+                    {loading
+                      ? 'Saving...'
+                      : editingHoliday
+                      ? 'Update Holiday'
+                      : 'Add Holiday'}
                   </button>
+
+                  {editingHoliday && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/10 text-sm font-bold text-white/70 transition hover:bg-white/5"
+                    >
+                      <X size={16} />
+                      Cancel Edit
+                    </button>
+                  )}
                 </div>
               </form>
             </div>

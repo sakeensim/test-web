@@ -10,7 +10,7 @@ import CheckOut from '../userPage/CheckOut'
 import DayOff from '../userPage/DayOff'
 import AdvanceSalary from '../userPage/AdvanceSalary'
 import UserHistoryPage from '../userPage/UserHistoryPage'
-
+import Home from '../userPage/Home'
 import AdminApprovalPage from '../adminPage/AdminApprovalPage'
 import Dashboard from '../adminPage/Dashboard'
 import UserManagement from '../adminPage/UserManagement'
@@ -19,6 +19,7 @@ import OrganizationSettings from '../adminPage/OrganizationSettings'
 import HolidayPage from '../adminPage/HolidayPage'
 import CalendarPage from '../adminPage/CalendarPage'
 import ProtectRoutes from './ProtectRoutes'
+import UserCalendarPage from '../userPage/UserCalendarPage'
 
 function AppRoutes() {
   return (
@@ -34,13 +35,14 @@ function AppRoutes() {
           />
         }
       >
-        <Route index element={<Profile />} />
+        <Route index element={<Home />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="check-in" element={<CheckIn />} />
         <Route path="check-out" element={<CheckOut />} />
         <Route path="day-off" element={<DayOff />} />
         <Route path="advancd-salary" element={<AdvanceSalary />} />
         <Route path="history" element={<UserHistoryPage />} />
-        <Route path="calendar" element={<CalendarPage />} />
+        <Route path="calendar" element={<UserCalendarPage />} />
       </Route>
 
       <Route
