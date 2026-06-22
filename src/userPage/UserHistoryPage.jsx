@@ -138,7 +138,6 @@ function UserHistoryPage() {
   }
 
   if (!data) return null
-
   const attendanceLogs = data.logs.attendanceLogs || []
   const overtimeLogs = data.logs.overtimeLogs || data.logs.overtimeTrackings || []
 
