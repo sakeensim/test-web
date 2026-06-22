@@ -280,7 +280,10 @@ function UserCalendarPage() {
       return
     }
 
-    if (diff < 0) {
+    // โทรศัพท์:
+    // ลากนิ้วลง = ขยาย
+    // ลากนิ้วขึ้น = ย่อ
+    if (diff > 0) {
       changeCalendarWithLock('expand')
     } else {
       changeCalendarWithLock('collapse')
@@ -408,40 +411,12 @@ function UserCalendarPage() {
 
   return (
     <div className="fixed inset-0 z-0 overflow-hidden bg-[#F5F8FD] text-[#0F172A]">
-      <div className="mx-auto flex h-full w-full max-w-md flex-col px-4 pb-[118px] pt-5">
-        <header className="mb-3 flex shrink-0 items-center justify-between">
-          <div>
-            <p className="text-sm font-black text-blue-600">WorkPal</p>
-            <h1 className="mt-0.5 text-[22px] font-black leading-tight tracking-tight">
-              ตารางงาน
-            </h1>
-            <p className="mt-0.5 text-xs font-semibold text-slate-500">
-              ปฏิทินประจำสาขาของคุณ
-            </p>
-          </div>
-        </header>
-
-        <section className="mb-3 shrink-0 rounded-[1.5rem] bg-gradient-to-br from-[#0057E7] via-[#0052D9] to-[#003BB5] p-3.5 text-white shadow-[0_12px_28px_rgba(37,99,235,0.24)]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
-              <Building2 size={20} />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold text-white/65">
-                สาขาของฉัน
-              </p>
-
-              <h2 className="truncate text-base font-black">
-                {profileLoading ? 'กำลังโหลดข้อมูลสาขา...' : branchName}
-              </h2>
-
-              <p className="truncate text-[11px] font-semibold text-white/65">
-                {profileLoading ? 'กรุณารอสักครู่' : branchAddress}
-              </p>
-            </div>
-          </div>
-        </section>
+      <div className="mx-auto flex h-full w-full max-w-md flex-col px-4 pb-[118px] pt-3">
+        <CompactTopBar
+          branchName={branchName}
+          branchAddress={branchAddress}
+          profileLoading={profileLoading}
+        />
 
         <section
           onWheel={handleCalendarWheel}
@@ -452,7 +427,7 @@ function UserCalendarPage() {
             touchAction: 'none',
           }}
         >
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
               onClick={goPrevMonth}
@@ -544,7 +519,7 @@ function UserCalendarPage() {
         </section>
 
         {calendarMode !== 'expanded' && (
-          <div className="mt-4 min-h-0 flex-1 overflow-hidden">
+          <div className="mt-3 min-h-0 flex-1 overflow-hidden">
             <DayDetailSection
               selectedDate={selectedDate}
               events={selectedDayEvents}
@@ -580,6 +555,36 @@ function UserCalendarPage() {
         />
       )}
     </div>
+  )
+}
+
+function CompactTopBar({ branchName, branchAddress, profileLoading }) {
+  return (
+    <section className="mb-2 shrink-0 rounded-[1.3rem] bg-gradient-to-br from-[#0057E7] via-[#0052D9] to-[#003BB5] px-3.5 py-3 text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-black text-white/65">WorkPal</p>
+          <h1 className="text-[20px] font-black leading-tight tracking-tight">
+            ตารางงาน
+          </h1>
+        </div>
+
+        <div className="flex max-w-[55%] items-center gap-2 rounded-2xl bg-white/12 px-2.5 py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15">
+            <Building2 size={17} />
+          </div>
+
+          <div className="min-w-0">
+            <p className="truncate text-[11px] font-black leading-tight">
+              {profileLoading ? 'กำลังโหลด...' : branchName}
+            </p>
+            <p className="truncate text-[10px] font-semibold leading-tight text-white/60">
+              {profileLoading ? 'กรุณารอสักครู่' : branchAddress}
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -686,7 +691,10 @@ function DayDetailSection({
       return
     }
 
-    if (diff < 0) {
+    // โทรศัพท์:
+    // ลากนิ้วลง = ขยาย
+    // ลากนิ้วขึ้น = ย่อ
+    if (diff > 0) {
       onBoundarySwipe('down', scrollRef.current)
     } else {
       onBoundarySwipe('up', scrollRef.current)
@@ -697,7 +705,7 @@ function DayDetailSection({
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
+      <div className="mb-2 flex shrink-0 items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black text-blue-600">
             {moment(selectedDate).format('dddd')}
@@ -728,9 +736,9 @@ function DayDetailSection({
         className="min-h-0 flex-1 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]"
       >
         {events.length === 0 ? (
-          <div className="flex h-full min-h-[130px] flex-col items-center justify-center text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
-              <CalendarDays size={22} className="text-slate-400" />
+          <div className="flex h-full min-h-[120px] flex-col items-center justify-center text-center">
+            <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm">
+              <CalendarDays size={21} className="text-slate-400" />
             </div>
             <h3 className="font-black text-slate-700">ไม่มีรายการวันนี้</h3>
             <p className="mt-1 text-xs font-semibold text-slate-400">
